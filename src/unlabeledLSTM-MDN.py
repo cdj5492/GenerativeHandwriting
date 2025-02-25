@@ -171,6 +171,7 @@ class HandwritingMDN(nn.Module):
                 
                 # Sample from mixture
                 # 1. Choose mixture component
+                
                 k = torch.multinomial(pi[0, 0], 1)[0]
                 
                 # 2. Sample from bivariate Gaussian
@@ -340,6 +341,7 @@ def train_model(model, data_loader, num_epochs=10, learning_rate=0.001, device='
 
 # Import our custom modules (assuming they're saved in separate files)
 from util.createUnlabeledTrainingData import generate_training_data
+from util.visualize import visualize_sequence_global, visualize_sequence_delta
 # from improved_handwriting_model import HandwritingMDN, train_model
 
 # If you're running this in a single script, you'd have the classes defined above
@@ -379,12 +381,12 @@ class HandwritingDataset(data.Dataset):
         sequence = self.sequences[idx]
         
         # If sequence is shorter than seq_length, pad with zeros
-        if len(sequence) < self.seq_length:
-            padding = torch.zeros(self.seq_length - len(sequence), 3)
-            sequence = torch.cat([sequence, padding], dim=0)
+        # if len(sequence) < self.seq_length:
+        #     padding = torch.zeros(self.seq_length - len(sequence), 3)
+        #     sequence = torch.cat([sequence, padding], dim=0)
         
         # If sequence is longer, take a random slice
-        elif len(sequence) > self.seq_length:
+        if len(sequence) > self.seq_length:
             start_idx = random.randint(0, len(sequence) - self.seq_length)
             sequence = sequence[start_idx:start_idx + self.seq_length]
             
@@ -406,74 +408,6 @@ def collate_variable_length(batch):
     
     return torch.stack(padded_batch)
 
-def visualize_sequence(sequence, title="Handwriting Sample", save_path=None):
-    """
-    Visualize a handwriting sequence
-    
-    Args:
-        sequence: Tensor of shape (seq_len, 3) containing [dx, dy, pen_state]
-        title: Title for the plot
-        save_path: Path to save the visualization (if None, will display)
-    """
-    # Convert to numpy for easier manipulation
-    if isinstance(sequence, torch.Tensor):
-        sequence = sequence.cpu().numpy()
-    
-    # Accumulate coordinates
-    x, y = 0, 0
-    coords_x = [x]
-    coords_y = [y]
-    pen_states = []
-    
-    for dx, dy, pen_state in sequence:
-        x += dx
-        y += dy
-        coords_x.append(x)
-        coords_y.append(y)
-        pen_states.append(pen_state)
-    
-    # Create figure
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.set_aspect('equal')
-    
-    # Plot points with different colors based on pen state
-    stroke_x = []
-    stroke_y = []
-    
-    for i in range(1, len(coords_x)):
-        stroke_x.append(coords_x[i-1])
-        stroke_y.append(coords_y[i-1])
-        
-        # If pen is up or it's the last point, end the stroke
-        if i == len(coords_x)-1 or pen_states[i-1] > 0.5:
-            stroke_x.append(coords_x[i])
-            stroke_y.append(coords_y[i])
-            ax.plot(stroke_x, stroke_y, 'k-', linewidth=2)
-            stroke_x = []
-            stroke_y = []
-    
-    # Set axis limits with some padding
-    x_min, x_max = min(coords_x), max(coords_x)
-    y_min, y_max = min(coords_y), max(coords_y)
-    
-    padding = max((x_max - x_min), (y_max - y_min)) * 0.1
-    ax.set_xlim(x_min - padding, x_max + padding)
-    ax.set_ylim(y_min - padding, y_max + padding)
-    
-    # Remove ticks
-    ax.set_xticks([])
-    ax.set_yticks([])
-    
-    # Set title
-    ax.set_title(title)
-    
-    # Save or display
-    if save_path:
-        plt.savefig(save_path, bbox_inches='tight')
-        plt.close()
-    else:
-        plt.tight_layout()
-        plt.show()
 
 def main():
     # Set device
@@ -486,11 +420,11 @@ def main():
     # random.seed(42)
     
     # Parameters
-    data_dir = "lineStrokes-all/lineStrokes"  # Replace with your data directory
-    max_files = 1000  # Set to None to use all files
+    data_dir = "lineStrokes-all/lineStrokes"
+    max_files = 2000  # Set to None to use all files
     batch_size = 32
-    seq_length = 100
-    num_epochs = 100
+    seq_length = 1000
+    num_epochs = 50
     learning_rate = 0.005
     
     # Create dataset
@@ -499,7 +433,7 @@ def main():
     dataset = HandwritingDataset(sequences, seq_length)
 
     # visualize one sample from the dataset
-    visualize_sequence(dataset[0], title="Sample from Dataset")
+    # visualize_sequence_delta(dataset[0], title="Sample from Dataset")
     
     # Create data loader
     data_loader = data.DataLoader(
@@ -555,7 +489,7 @@ def main():
             )
         
         # Visualize and save
-        visualize_sequence(
+        visualize_sequence_delta(
             initial_sample, 
             title="Handwriting Sample Before Training",
             save_path="plots/handwriting_before_training.png"
@@ -589,7 +523,7 @@ def main():
             seed_sequence = sequences[0][:5].clone().to(device)
             
             # Generate samples with different temperatures
-            for temp in [0.5, 1.0, 1.5]:
+            for temp in [0.05, 0.5, 1.0, 1.5]:
                 trained_sample = model.sample(
                     seq_len=200,
                     temperature=temp,
@@ -598,14 +532,15 @@ def main():
                 )
                 
                 # Visualize and save
-                visualize_sequence(
+                # visualize_sequence_global(initial_sample, title=f"Handwriting Sample After Training (Temp={temp})")
+                visualize_sequence_delta(
                     trained_sample, 
                     title=f"Handwriting Sample After Training (Temp={temp})",
                     save_path=f"plots/handwriting_after_training_temp{temp}.png"
                 )
         else:
             # Generate without seed
-            for temp in [0.5, 1.0, 1.5]:
+            for temp in [0.05, 0.5, 1.0, 1.5]:
                 trained_sample = model.sample(
                     seq_len=200,
                     temperature=temp,
@@ -613,7 +548,7 @@ def main():
                     device=device
                 )
                 
-                visualize_sequence(
+                visualize_sequence_delta(
                     trained_sample, 
                     title=f"Handwriting Sample After Training (Temp={temp})",
                     save_path=f"handwriting_after_training_temp{temp}.png"
