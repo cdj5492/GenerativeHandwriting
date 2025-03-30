@@ -3,6 +3,7 @@ import pygame.locals
 import time
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
+import os
 from datetime import datetime
 
 class StrokeCapture:
