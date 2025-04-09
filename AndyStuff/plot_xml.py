@@ -1,3 +1,29 @@
+"""
+XML Stroke Visualizer
+----------------------
+
+This script allows users to open a custom XML file containing handwritten stroke data
+(captured using a stylus or mouse) and visualize the strokes as a line plot.
+
+Functionality:
+- Opens a file dialog for selecting a `.xml` stroke file.
+- Parses strokes from `<Stroke>` elements and their `<Point>` children.
+- Each point is expected to have `x` and `y` attributes.
+- Plots each stroke as a connected line using `matplotlib`.
+
+Usage:
+- Run the script and select a stroke XML file when prompted.
+- A matplotlib plot window will open, showing the handwritten strokes.
+
+Requirements:
+- Python 3
+- matplotlib
+- tkinter
+
+Intended Use:
+- For visualizing and verifying stroke capture output produced by interactive data collection tools.
+- Compatible with stroke files saved by custom tools like StrokeCapture.
+"""
 import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 from tkinter import Tk, filedialog

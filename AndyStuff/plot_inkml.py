@@ -1,3 +1,32 @@
+"""
+InkML Viewer and LaTeX Extractor
+--------------------------------
+
+This script allows users to select and inspect a single InkML file, visualize its pen stroke
+data, and extract the associated LaTeX expression if it exists.
+
+Functionality:
+- Opens a file dialog for selecting an `.inkml` file.
+- Parses the file to extract pen stroke data encoded in `<trace>` elements.
+- Optionally extracts a LaTeX expression from:
+    - <annotation> tags with type="truth" or text containing "latex"
+    - <annotationXML> tags with a LaTeX type attribute
+- Displays the parsed stroke data using matplotlib as a 2D line plot.
+- Prints the guessed LaTeX expression (if found) to the terminal.
+
+Usage:
+- Run the script and select an InkML file when prompted.
+- View the corresponding strokes and the associated LaTeX math expression.
+
+Requirements:
+- Python 3
+- matplotlib
+- tkinter
+
+Intended Use:
+- Useful for debugging InkML files or manually inspecting how expressions are written.
+- Can be used as a data exploration tool for datasets like CROHME or HME100K.
+"""
 import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 from tkinter import Tk, filedialog
