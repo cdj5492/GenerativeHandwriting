@@ -11,6 +11,7 @@ Functionality:
 - Captures and saves the handwritten pen strokes in an XML format (with timing and coordinates).
 - Saves the corresponding LaTeX expression in a text file alongside the XML.
 - All outputs are organized into a session folder with separate `xml/` and `text/` subdirectories.
+- At the end of the session, it creates a CSV file summarizing all saved samples.
 
 Controls:
 - Draw using the mouse or stylus.
@@ -50,6 +51,7 @@ class StrokeCapture:
         self.start_time = 0
         self.end_time = 0
         self.save_index = 1
+        self.saved_entries = []  # holds (index, xml, txt, expr)
 
         self.clock = pygame.time.Clock()
 
@@ -84,8 +86,7 @@ class StrokeCapture:
         return latex_expr
 
     def render_latex_to_surface(self, latex_str):
-        # Create a taller and slightly narrower figure for better proportions
-        fig, ax = plt.subplots(figsize=(10.0, 3.0), dpi=100)  # Adjusted for better height
+        fig, ax = plt.subplots(figsize=(10.0, 3.0), dpi=100)
         ax.text(0.5, 0.5, f"${latex_str}$", fontsize=30, ha='center', va='center')
         ax.axis('off')
 
@@ -95,16 +96,12 @@ class StrokeCapture:
         buf.seek(0)
 
         img = Image.open(buf).convert("RGB")
-        
-        # Optionally make it even taller manually (adjust as needed)
-        img = img.resize((700, 160))  # More height, tighter width
-
+        img = img.resize((700, 160))
         mode = img.mode
         size = img.size
         data = img.tobytes()
 
         return pygame.image.fromstring(data, size, mode)
-
 
     def run(self):
         running = True
@@ -149,6 +146,7 @@ class StrokeCapture:
             self.clock.tick(60)
 
         pygame.quit()
+        self.write_summary_files()
 
     def draw_line(self):
         if len(self.current_stroke) < 2:
@@ -217,7 +215,9 @@ class StrokeCapture:
         with open(txt_path, 'w', encoding='utf-8') as f:
             f.write(self.current_equation)
 
+        self.saved_entries.append((self.save_index - 1, f"{idx_str}.xml", f"{idx_str}.txt", self.current_equation))
         print(f"Saved: {idx_str}.xml + {idx_str}.txt")
+
         self.next_equation()
 
     def next_equation(self):
@@ -227,6 +227,26 @@ class StrokeCapture:
             self.clear_screen()
         else:
             print("All equations completed.")
+
+    def write_summary_files(self):
+        if not self.saved_entries:
+            return
+
+        # Write .txt file
+        txt_path = os.path.join(self.session_dir, "all_expressions.txt")
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            for _, _, _, expr in self.saved_entries:
+                f.write(expr + '\n')
+
+        # Write .csv file
+        csv_path = os.path.join(self.session_dir, "session_summary.csv")
+        with open(csv_path, 'w', encoding='utf-8') as f:
+            f.write("index,xml_filename,text_filename,expression\n")
+            for idx, xml_name, txt_name, expr in self.saved_entries:
+                escaped = expr.replace('"', '""')  # escape quotes for CSV
+                f.write(f'{idx},"{xml_name}","{txt_name}","{escaped}"\n')
+
+        print(f"✓ Summary written to:\n  {txt_path}\n  {csv_path}")
 
 if __name__ == "__main__":
     Tk().withdraw()
