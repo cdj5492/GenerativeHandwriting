@@ -78,12 +78,15 @@ class StrokeCapture:
             r"\gt": ">",
             r"\leq": r"\le",
             r"\geq": r"\ge",
+            r"\le": "<=",
+            r"\ge": ">=",
             r"\neq": r"\ne",
             r"\=": "="
         }
         for old, new in replacements.items():
             latex_expr = latex_expr.replace(old, new)
         return latex_expr
+
 
     def render_latex_to_surface(self, latex_str):
         fig, ax = plt.subplots(figsize=(10.0, 3.0), dpi=100)
