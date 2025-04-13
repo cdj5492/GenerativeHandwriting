@@ -7,7 +7,10 @@ def generate_latex_document(lines):
 \usepackage[margin=1in]{geometry}
 \begin{document}
 """
-    body = "\n".join([f"\\[\n{line.strip()}\n\\]" for line in lines if line.strip()])
+    body = "\n".join(
+        [f"\\noindent {i+1})\\quad \\[ {line.strip().replace('\\lt', '<').replace('\\gt', '>')} \\]"
+         for i, line in enumerate(lines) if line.strip()]
+    )
     footer = r"\end{document}"
     return f"{header}\n{body}\n{footer}"
 
@@ -28,7 +31,6 @@ def main():
 
     latex_code = generate_latex_document(expressions)
 
-    # Save to .tex file
     output_path = os.path.join(os.path.dirname(file_path), "generated_latex_document.tex")
     with open(output_path, 'w', encoding='utf-8') as out_f:
         out_f.write(latex_code)

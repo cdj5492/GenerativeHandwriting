@@ -167,7 +167,7 @@ class StrokeCapture:
 
         try:
             latex_surface = self.render_latex_to_surface(sanitized_expr)
-            self.screen.blit(latex_surface, (self.width // 2 - 450, 10))
+            self.screen.blit(latex_surface, (20, 20))
         except Exception as e:
             print("Error rendering LaTeX:", sanitized_expr)
             print(e)
