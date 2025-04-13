@@ -2,7 +2,7 @@ import os
 import shutil
 import csv
 from tkinter import Tk, filedialog
-from tqdm import tqdm  # Make sure tqdm is installed: pip install tqdm
+from tqdm import tqdm  # pip install tqdm
 
 def consolidate_sessions_gui():
     # --- GUI Prompt for Folder Selection ---
@@ -72,7 +72,13 @@ def consolidate_sessions_gui():
                     shutil.copy(xml_path, os.path.join(xml_out_dir, new_xml))
 
                     with open(txt_path, 'r', encoding='utf-8') as f:
-                        expression = f.read().strip().replace('−', '-')
+                        expression = (
+                            f.read()
+                            .strip()
+                            .replace('−', '-')        # Replace Unicode minus
+                            .replace('\\lt', '<')     # Replace \lt with <
+                            .replace('\\gt', '>')     # Replace \gt with >
+                        )
 
                     all_expressions_file.write(expression + '\n')
                     writer.writerow([index, new_txt, new_xml, expression])
