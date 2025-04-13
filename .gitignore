@@ -1,6 +1,4 @@
-ascii-all/
-lineStrokes-all/
-original-xml-part/
+data/
 models/
 *.pyc
 plots/
