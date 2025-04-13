@@ -249,7 +249,7 @@ class StrokeCapture:
                 escaped = expr.replace('"', '""')  # escape quotes for CSV
                 f.write(f'{idx},"{xml_name}","{txt_name}","{escaped}"\n')
 
-        print(f"✓ Summary written to:\n  {txt_path}\n  {csv_path}")
+        print(f"Summary written to:\n  {txt_path}\n  {csv_path}")
 
 if __name__ == "__main__":
     Tk().withdraw()

@@ -35,7 +35,7 @@ def main():
     with open(output_path, 'w', encoding='utf-8') as out_f:
         out_f.write(latex_code)
 
-    print(f"✓ LaTeX document written to:\n{output_path}")
+    print(f"LaTeX document written to:\n{output_path}")
 
 if __name__ == "__main__":
     main()

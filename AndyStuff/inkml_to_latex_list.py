@@ -64,7 +64,7 @@ def collect_latex_from_directory(input_dir, output_filename="all_equations.txt")
                 latex = f"MISSING_LATEX for {fname}"
             out_file.write(latex + "\n")
 
-    print(f"\n✓ LaTeX list written to: {output_path}")
+    print(f"\nLaTeX list written to: {output_path}")
 
 if __name__ == "__main__":
     Tk().withdraw()

@@ -33,7 +33,7 @@ def main():
         for line in deduplicated:
             f.write(line + "\n")
 
-    print(f"\n✓ Deduplicated output written to:\n{output_path}")
+    print(f"\nDeduplicated output written to:\n{output_path}")
 
 if __name__ == "__main__":
     main()
