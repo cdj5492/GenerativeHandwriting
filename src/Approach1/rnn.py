@@ -24,7 +24,9 @@ def rnn_free_run(cell, sequence_length, initial_state, initial_input, device):
     input = initial_input
 
     for t in range(sequence_length):
+        print("before-----------------------------------------")
         output, state = cell(input, state)
+        print("after-------------------------------------------")
         outputs.append(output)
         input = output  # Use the output as the next input
 
@@ -208,12 +210,14 @@ class RNNModel(nn.Module):
         initial_state = self.cell.zero_state(batch_size, device=device)
         
         # Run the RNN over the input sequence.
+        print("here1")
         outputs, final_state = self.cell.dynamic_rnn(
             inputs=x,
             sequence_lengths=x_len,
             initial_state=initial_state,
             device=device
         )
+        print("here2")
         
         # Apply a dense layer at each time step.
         params = self.gmm_dense(outputs)

@@ -133,31 +133,14 @@ class LSTMAttentionCell(nn.Module):
         # In TF, phi is expanded then used with attention_values.
         phi = phi_flat.unsqueeze(2)  # shape: [batch, char_len, 1]
         # Create sequence mask for attention_values_lengths.
-
-        # Compute phi_flat: sum over mixtures. Resulting shape [batch, char_len]
-        phi_flat = torch.sum(alpha_exp * torch.exp(- (kappa_exp - u) ** 2 / beta_exp), dim=1)
-        # In TF, phi is expanded then used with attention_values.
-        phi = phi_flat.unsqueeze(2)  # shape: [batch, char_len, 1]
-
-        # --- FIX: Replicate attention values & lengths if batch sizes differ ---
-        # If the batch size in attention_values is different from the current inputs batch size,
-        # replicate the first attention sample for all inputs.
-        if self.attention_values.size(0) != inputs.size(0):
-            attn_values = self.attention_values[:1].expand(inputs.size(0), self.char_len, self.alphabet_size)
-            attn_lengths = self.attention_values_lengths[:1].expand(inputs.size(0))
-        else:
-            attn_values = self.attention_values
-            attn_lengths = self.attention_values_lengths
-
-        # Create sequence mask for attn_lengths.
+        # Mask: [batch, char_len]
+        # print out the shapes of everything that goes into making the mask
+        # print("inputs.size():", inputs.size())
+        # print("self.attention_values_lengths.size():", self.attention_values_lengths.size())
+        # print("char_len:", self.char_len)
         mask = (torch.arange(self.char_len, device=inputs.device)
                 .unsqueeze(0).expand(inputs.size(0), self.char_len)
-                < attn_lengths.unsqueeze(1)).float()
-        mask = mask.unsqueeze(2)  # shape: [batch, char_len, 1]
-
-        # Compute weighted attention vector w using the replicated attention values.
-        w = torch.sum(phi * attn_values * mask, dim=1)  # shape: [batch, alphabet_size]
-
+                < self.attention_values_lengths.unsqueeze(1)).float()
         mask = mask.unsqueeze(2)  # shape: [batch, char_len, 1]
         # Compute weighted attention vector w.
         # attention_values has shape [batch, char_len, alphabet_size]
