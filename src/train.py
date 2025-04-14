@@ -16,7 +16,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from models import HandWritingPredictionNet, HandWritingSynthesisNet
+# from models import HandWritingPredictionNet, HandWritingSynthesisNet
+from transformer_handwriting_models import HandWritingPredictionNet, HandWritingSynthesisNet
 from utils import plot_stroke
 from utils.constants import Global
 from utils.dataset import HandwritingDataset
@@ -175,8 +176,9 @@ def train(
     best_epoch = 0
     k = 0
 
-    # TODO: remove this later... 
-    torch.save(model.state_dict(), model_path)
+    # if the modelfile doesn't exist, create it
+    if not os.path.exists(model_path):
+        torch.save(model.state_dict(), model_path)
 
     # generate one before training for visualization
     if model_type == "prediction":
@@ -251,11 +253,11 @@ def train(
                 plt.imshow(phi, cmap="viridis", aspect="auto")
                 plt.colorbar()
                 plt.xlabel("time steps")
-                plt.yticks(
-                    np.arange(phi.shape[1]),
-                    list("Hello world!  "),
-                    rotation="horizontal",
-                )
+                # plt.yticks(
+                #     np.arange(phi.shape[1]),
+                #     list("Hello world!  "),
+                #     rotation="horizontal",
+                # )
                 plt.margins(0.2)
                 plt.subplots_adjust(bottom=0.15)
                 plt.savefig(save_path + "heat_map" + str(best_epoch) + ".png")
@@ -313,6 +315,18 @@ if __name__ == "__main__":
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+
+    # print the shape of one batch
+    for i, mini_batch in enumerate(train_loader):
+        if model_type == "prediction":
+            print("Input shape: ", mini_batch[0].shape)
+            print("Target shape: ", mini_batch[1].shape)
+        else:
+            print("Input shape: ", mini_batch[0].shape)
+            print("Target shape: ", mini_batch[1].shape)
+            print("Mask shape: ", mini_batch[2].shape)
+            print("Text shape: ", mini_batch[3].shape)
+            print("Text mask shape: ", mini_batch[4].shape)
 
     if model_type == "prediction":
         model = HandWritingPredictionNet(
