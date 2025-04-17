@@ -6,6 +6,11 @@ from matplotlib import pyplot
 
 
 def plot_stroke(stroke, save_name=None):
+    # helps with getting it to show up early in training
+    stroke = numpy.append(stroke, [[1, 0, 0]], axis=0)
+
+    print(stroke)
+
     # Plot a single example.
     f, ax = pyplot.subplots()
 
@@ -33,7 +38,8 @@ def plot_stroke(stroke, save_name=None):
     else:
         try:
             pyplot.savefig(save_name, bbox_inches="tight", pad_inches=0.5)
-        except Exception:
+        except Exception as e:
             print("Error building image!: " + save_name)
+            print(e)
 
     pyplot.close()

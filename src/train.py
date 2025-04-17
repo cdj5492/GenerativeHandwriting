@@ -7,17 +7,18 @@ import argparse
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from torch.utils import data
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch.distributions import bernoulli, uniform
 import torch.nn.functional as F
+import random
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# from models import HandWritingPredictionNet, HandWritingSynthesisNet
-from transformer_handwriting_models import HandWritingPredictionNet, HandWritingSynthesisNet
+from models import HandWritingPredictionNet, HandWritingSynthesisNet
+# from transformer_handwriting_models import HandWritingPredictionNet, HandWritingSynthesisNet
 from utils import plot_stroke
 from utils.constants import Global
 from utils.dataset import HandwritingDataset
@@ -33,7 +34,7 @@ def argparser():
     parser.add_argument("--n_layers", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--step_size", type=int, default=100)
-    parser.add_argument("--n_epochs", type=int, default=10)
+    parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--patience", type=int, default=15)
     parser.add_argument("--model_type", type=str, default="prediction")
@@ -179,6 +180,8 @@ def train(
     # if the modelfile doesn't exist, create it
     if not os.path.exists(model_path):
         torch.save(model.state_dict(), model_path)
+    else:
+        model.load_state_dict(torch.load(model_path))
 
     # generate one before training for visualization
     if model_type == "prediction":
@@ -188,7 +191,7 @@ def train(
     else:
         gen_seq, phi = generate_conditional_sequence(
             model_path,
-            "Hello world!",
+            "3(3b+4)-6=-12",
             device,
             train_loader.dataset.char_to_id,
             train_loader.dataset.idx_to_char,
@@ -239,7 +242,7 @@ def train(
             else:
                 gen_seq, phi = generate_conditional_sequence(
                     model_path,
-                    "Hello world!",
+                    "3(3b+4)-6=-12",
                     device,
                     train_loader.dataset.char_to_id,
                     train_loader.dataset.idx_to_char,
@@ -313,28 +316,22 @@ if __name__ == "__main__":
         data_aug=args.data_aug,
     )
 
+    # cut it down by a bunch for testing
+    # train_dataset = Subset(train_dataset, random.sample(range(len(train_dataset)), int(0.2 * len(train_dataset))))
+
+    # train_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
-    # print the shape of one batch
-    for i, mini_batch in enumerate(train_loader):
-        if model_type == "prediction":
-            print("Input shape: ", mini_batch[0].shape)
-            print("Target shape: ", mini_batch[1].shape)
-        else:
-            print("Input shape: ", mini_batch[0].shape)
-            print("Target shape: ", mini_batch[1].shape)
-            print("Mask shape: ", mini_batch[2].shape)
-            print("Text shape: ", mini_batch[3].shape)
-            print("Text mask shape: ", mini_batch[4].shape)
+    sample_batch = next(iter(train_loader))
+    print("sample batch", sample_batch[0])
 
     if model_type == "prediction":
         model = HandWritingPredictionNet(
-            hidden_size=400, n_layers=3, output_size=121, input_size=3
+            n_layers=3, output_size=121, input_size=3
         )
     elif model_type == "synthesis":
         model = HandWritingSynthesisNet(
-            hidden_size=400,
             n_layers=3,
             output_size=121,
             window_size=train_dataset.vocab_size,

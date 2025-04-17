@@ -100,7 +100,7 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 class HandWritingPredictionNet(nn.Module):
-    def __init__(self, hidden_size=400, n_layers=3, output_size=121, input_size=3, max_seq_len=1000):
+    def __init__(self, hidden_size=128, n_layers=3, output_size=121, input_size=3, max_seq_len=1000):
         super(HandWritingPredictionNet, self).__init__()
         self.input_proj = nn.Linear(input_size, hidden_size)
         self.pos_encoding = PositionalEncoding(hidden_size)
@@ -141,7 +141,7 @@ class HandWritingPredictionNet(nn.Module):
         return gen_seq.detach().cpu().numpy()
 
 class HandWritingSynthesisNet(nn.Module):
-    def __init__(self, hidden_size=400, n_layers=3, output_size=121, window_size=77, max_seq_len=1000):
+    def __init__(self, hidden_size=128, n_layers=3, output_size=121, window_size=77, max_seq_len=1000):
         super(HandWritingSynthesisNet, self).__init__()
         self.input_proj = nn.Linear(3, hidden_size)
         self.pos_encoding = PositionalEncoding(hidden_size)

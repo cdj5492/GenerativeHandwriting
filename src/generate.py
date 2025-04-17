@@ -9,8 +9,8 @@ from utils import plot_stroke
 from utils.constants import Global
 from utils.dataset import HandwritingDataset
 from utils.data_utils import data_denormalization, data_normalization
-# from models import HandWritingPredictionNet, HandWritingSynthesisNet
-from transformer_handwriting_models import HandWritingPredictionNet, HandWritingSynthesisNet
+from models import HandWritingPredictionNet, HandWritingSynthesisNet
+# from transformer_handwriting_models import HandWritingPredictionNet, HandWritingSynthesisNet
 
 
 def argparser():
