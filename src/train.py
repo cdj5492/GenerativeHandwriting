@@ -186,7 +186,7 @@ def train(
     # generate one before training for visualization
     if model_type == "prediction":
         gen_seq = generate_unconditional_seq(
-            model_path, 700, device, bias=10.0, style=None, prime=False
+            model_path, 700, device, bias=10.0, style=None, prime=False, model_arch='lstm'
         )
     else:
         gen_seq, phi = generate_conditional_sequence(
@@ -199,6 +199,7 @@ def train(
             prime_seq=None,
             real_text=None,
             is_map=True,
+            model_arch='lstm',
         )
 
     # denormalize the generated offsets using train set mean and std
@@ -236,7 +237,7 @@ def train(
             torch.save(model.state_dict(), model_path)
             if model_type == "prediction":
                 gen_seq = generate_unconditional_seq(
-                    model_path, 700, device, bias=10.0, style=None, prime=False
+                    model_path, 700, device, bias=10.0, style=None, prime=False, model_arch='lstm'
                 )
 
             else:
@@ -250,6 +251,7 @@ def train(
                     prime_seq=None,
                     real_text=None,
                     is_map=True,
+                    model_arch='lstm',
                 )
 
                 plt.imshow(phi, cmap="viridis", aspect="auto")
