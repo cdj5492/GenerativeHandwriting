@@ -21,7 +21,7 @@ from models import HandWritingPredictionNet, HandWritingSynthesisNet
 # from transformer_handwriting_models import HandWritingPredictionNet, HandWritingSynthesisNet
 from utils import plot_stroke
 from utils.constants import Global
-from utils.dataset import HandwritingDataset
+from utils.dataset import HandwritingDataset, MathHandwritingDataset
 from utils.model_utils import compute_nll_loss
 from utils.data_utils import data_denormalization
 from generate import generate_conditional_sequence, generate_unconditional_seq
@@ -36,7 +36,7 @@ def argparser():
     parser.add_argument("--step_size", type=int, default=100)
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.001)
-    parser.add_argument("--patience", type=int, default=15)
+    parser.add_argument("--patience", type=int, default=1500)
     parser.add_argument("--model_type", type=str, default="prediction")
     parser.add_argument("--data_path", type=str, default="./data/")
     parser.add_argument("--save_path", type=str, default="./logs/")
@@ -190,11 +190,10 @@ def train(
         )
     else:
         gen_seq, phi = generate_conditional_sequence(
-            model_path,
-            "3(3b+4)-6=-12",
-            device,
-            train_loader.dataset.char_to_id,
-            train_loader.dataset.idx_to_char,
+            model_path=model_path,
+            char_seq="3(3b+4)-6=-12",
+            device=device,
+            dataset=train_loader.dataset,
             bias=10.0,
             prime=False,
             prime_seq=None,
@@ -203,7 +202,7 @@ def train(
         )
 
     # denormalize the generated offsets using train set mean and std
-    gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
+    # gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
 
     # plot the sequence
     plot_stroke(
@@ -218,19 +217,20 @@ def train(
         )
 
         print("validation....")
-        valid_loss = validation(model, valid_loader, device, epoch, model_type)
+        # valid_loss = validation(model, valid_loader, device, epoch, model_type)
 
         train_losses.append(train_loss)
-        valid_losses.append(valid_loss)
+        # valid_losses.append(valid_loss)
 
         print("Epoch {}: Train: avg. loss: {:.3f}".format(epoch + 1, train_loss))
-        print("Epoch {}: Valid: avg. loss: {:.3f}".format(epoch + 1, valid_loss))
+        # print("Epoch {}: Valid: avg. loss: {:.3f}".format(epoch + 1, valid_loss))
 
         if step_size != -1:
             scheduler.step()
 
-        if valid_loss < best_loss:
-            best_loss = valid_loss
+        # if valid_loss < best_loss:
+        if True:
+            # best_loss = valid_loss
             best_epoch = epoch + 1
             print("Saving best model at epoch {}".format(epoch + 1))
             torch.save(model.state_dict(), model_path)
@@ -241,11 +241,10 @@ def train(
 
             else:
                 gen_seq, phi = generate_conditional_sequence(
-                    model_path,
-                    "3(3b+4)-6=-12",
-                    device,
-                    train_loader.dataset.char_to_id,
-                    train_loader.dataset.idx_to_char,
+                    model_path=model_path,
+                    char_seq="3(3b+4)-6=-12",
+                    device=device,
+                    dataset=train_loader.dataset,
                     bias=10.0,
                     prime=False,
                     prime_seq=None,
@@ -301,14 +300,14 @@ if __name__ == "__main__":
     n_epochs = args.n_epochs
 
     # Load the data and text
-    train_dataset = HandwritingDataset(
+    train_dataset = MathHandwritingDataset(
         args.data_path,
         split="train",
         text_req=args.text_req,
         debug=args.debug,
         data_aug=args.data_aug,
     )
-    valid_dataset = HandwritingDataset(
+    valid_dataset = MathHandwritingDataset(
         args.data_path,
         split="valid",
         text_req=args.text_req,

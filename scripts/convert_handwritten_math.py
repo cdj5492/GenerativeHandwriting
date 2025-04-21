@@ -130,7 +130,11 @@ def main():
     #    mapping.csv
     #    xml/         -> contains the XML files with stroke data
     #    text/        -> (not used here, mapping.csv provides LaTeX expressions)
+    # base_dir = 'data/raw/consolidated_math'
+
+    # base_dir = 'AndyStuff/output_sessions/session_20250420_152042'
     base_dir = 'data/raw/consolidated_math'
+    base_dir = os.path.abspath(base_dir)
     mapping_path = os.path.join(base_dir, 'mapping.csv')
     xml_dir = os.path.join(base_dir, 'xml')
     
@@ -154,18 +158,50 @@ def main():
         strokes_list.append(stroke_data)
         sentences.append(latex_expression)
     
-    # Pad the variable-length stroke sequences to form a homogeneous array.
+    # normalized_strokes_list = []
+    # for stroke in strokes_list:
+    #     _, _, norm_stroke = data_normalization(stroke)
+    #     normalized_strokes_list.append(norm_stroke)
+
+    # manually normalize literally everything
+    # max_xy = np.array([0, 0])
+    # min_xy = np.array([0, 0])
+    # for stroke in strokes_list:
+    #     max_xy = np.maximum(max_xy, stroke[:, 1:].max(axis=0))
+    #     min_xy = np.minimum(min_xy, stroke[:, 1:].min(axis=0))
+    # for i, stroke in enumerate(strokes_list):
+    #     strokes_list[i][:, 1:] /= (max_xy - min_xy)
+
+    # normalize but with the same scaling on x and y
+    for i, stroke in enumerate(strokes_list):
+        max_val = stroke[:, 1:].max()
+        min_val = stroke[:, 1:].min()
+        strokes_list[i][:, 1:] /= (max_val - min_val)
+    
+    # flip x axis
+    # for i, stroke in enumerate(strokes_list):
+    #     strokes_list[i][:, 1] *= -1
+    # flip y axis
+    for i, stroke in enumerate(strokes_list):
+        strokes_list[i][:, 2] *= -1
+
+    # Now pad
     padded_data, lengths = pad_strokes(strokes_list)
+
+    # Pad the variable-length stroke sequences to form a homogeneous array.
+    # padded_data, lengths = pad_strokes(strokes_list)
     
     # Normalize the padded data using train_offset_normalization.
     # This adjusts the coordinate offsets (columns 1 and 2) so that they have zero mean and unit standard deviation.
-    mean, std, norm_data = train_offset_normalization(padded_data)
+    # mean, std, norm_data = train_offset_normalization(padded_data)
+
+    # print(mean, std)
     
     # Convert the normalized data back into a list of variable-length arrays using the original lengths.
-    normalized_strokes_list = [norm_data[i, :lengths[i], :] for i in range(len(lengths))]
+    # normalized_strokes_list = [norm_data[i, :lengths[i], :] for i in range(len(lengths))]
     
     # Save the normalized stroke sequences as an object array since each element might have a different shape.
-    strokes_arr = np.array(normalized_strokes_list, dtype=object)
+    strokes_arr = np.array(strokes_list, dtype=object)
     np.save(os.path.join(base_dir, 'strokes.npy'), strokes_arr)
     
     # Save the sentences (LaTeX expressions) to sentences.txt, one per line.

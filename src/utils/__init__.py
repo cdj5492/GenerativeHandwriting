@@ -9,7 +9,8 @@ def plot_stroke(stroke, save_name=None):
     # helps with getting it to show up early in training
     stroke = numpy.append(stroke, [[1, 0, 0]], axis=0)
 
-    print(stroke)
+    for point in stroke:
+        print(point)
 
     # Plot a single example.
     f, ax = pyplot.subplots()

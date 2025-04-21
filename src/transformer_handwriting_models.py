@@ -1,192 +1,304 @@
 
-import torch
 import math
+from typing import Optional
+
+import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.distributions import bernoulli
+from torch.distributions import bernoulli, uniform
 from utils.model_utils import stable_softmax
+
+
+# --------------------------------------------------------------------------- #
+# Utilities
+# --------------------------------------------------------------------------- #
 
 def sample_from_out_dist(y_hat, bias):
     split_sizes = [1] + [20] * 6
-    y_parts = torch.split(y_hat, split_sizes, dim=-1)
+    y = torch.split(y_hat, split_sizes, dim=0)
 
-    eos_prob = torch.sigmoid(y_parts[0])
-    mixture_weights = stable_softmax(y_parts[1] * (1 + bias), dim=-1)
-    mu_1 = y_parts[2]
-    mu_2 = y_parts[3]
-    std_1 = torch.exp(y_parts[4] - bias)
-    std_2 = torch.exp(y_parts[5] - bias)
-    correlations = torch.tanh(y_parts[6])
+    eos_prob = torch.sigmoid(y[0])
+    mixture_weights = stable_softmax(y[1] * (1 + bias), dim=0)
+    mu_1 = y[2]
+    mu_2 = y[3]
+    std_1 = torch.exp(y[4] - bias)
+    std_2 = torch.exp(y[5] - bias)
+    correlations = torch.tanh(y[6])
+
+    bernoulli_dist = bernoulli.Bernoulli(probs=eos_prob)
+    eos_sample = bernoulli_dist.sample()
+
+    K = torch.multinomial(mixture_weights, 1)
+
+    mu_k = y_hat.new_zeros(2)
+
+    mu_k[0] = mu_1[K]
+    mu_k[1] = mu_2[K]
+    cov = y_hat.new_zeros(2, 2)
+    cov[0, 0] = std_1[K].pow(2)
+    cov[1, 1] = std_2[K].pow(2)
+    cov[0, 1], cov[1, 0] = (
+        correlations[K] * std_1[K] * std_2[K],
+        correlations[K] * std_1[K] * std_2[K],
+    )
+
+    x = torch.normal(mean=torch.Tensor([0.0, 0.0]), std=torch.Tensor([1.0, 1.0])).to(
+        y_hat.device
+    )
+    Z = mu_k + torch.mv(cov, x)
+
+    sample = y_hat.new_zeros(1, 1, 3)
+    sample[0, 0, 0] = eos_sample.item()
+    sample[0, 0, 1:] = Z
+    return sample
+
+
+def sample_batch_from_out_dist(y_hat, bias):
+    batch_size = y_hat.shape[0]
+    split_sizes = [1] + [20] * 6
+    y = torch.split(y_hat, split_sizes, dim=1)
+
+    eos_prob = torch.sigmoid(y[0])
+    mixture_weights = stable_softmax(y[1] * (1 + bias), dim=1)
+    mu_1 = y[2]
+    mu_2 = y[3]
+    std_1 = torch.exp(y[4] - bias)
+    std_2 = torch.exp(y[5] - bias)
+    correlations = torch.tanh(y[6])
 
     bernoulli_dist = bernoulli.Bernoulli(probs=eos_prob)
     eos_sample = bernoulli_dist.sample()
 
     K = torch.multinomial(mixture_weights, 1).squeeze()
-    mu_k = torch.cat((mu_1[:, K], mu_2[:, K]), dim=-1)
 
-    std1 = std_1[:, K]
-    std2 = std_2[:, K]
-    corr = correlations[:, K]
+    mu_k = y_hat.new_zeros((y_hat.shape[0], 2))
 
-    cov = torch.zeros(2, 2, device=y_hat.device)
-    cov[0, 0] = std1.pow(2)
-    cov[1, 1] = std2.pow(2)
-    cov[0, 1] = cov[1, 0] = corr * std1 * std2
+    mu_k[:, 0] = mu_1[torch.arange(batch_size), K]
+    mu_k[:, 1] = mu_2[torch.arange(batch_size), K]
+    cov = y_hat.new_zeros(y_hat.shape[0], 2, 2)
+    cov[:, 0, 0] = std_1[torch.arange(batch_size), K].pow(2)
+    cov[:, 1, 1] = std_2[torch.arange(batch_size), K].pow(2)
+    cov[:, 0, 1], cov[:, 1, 0] = (
+        correlations[torch.arange(batch_size), K]
+        * std_1[torch.arange(batch_size), K]
+        * std_2[torch.arange(batch_size), K],
+        correlations[torch.arange(batch_size), K]
+        * std_1[torch.arange(batch_size), K]
+        * std_2[torch.arange(batch_size), K],
+    )
 
-    x = torch.randn(2, device=y_hat.device)
-    Z = mu_k.squeeze() + torch.mv(cov, x)
+    X = torch.normal(
+        mean=torch.zeros(batch_size, 2, 1), std=torch.ones(batch_size, 2, 1)
+    ).to(y_hat.device)
+    Z = mu_k + torch.matmul(cov, X).squeeze()
 
-    sample = y_hat.new_zeros(1, 3)
-    sample[0, 0] = eos_sample.item()
-    sample[0, 1:] = Z
+    sample = y_hat.new_zeros(batch_size, 1, 3)
+    sample[:, 0, 0:1] = eos_sample
+    sample[:, 0, 1:] = Z.squeeze()
     return sample
 
-def sample_batch_from_out_dist(y_hat, bias):
-    batch_size = y_hat.shape[0]
-    split_sizes = [1] + [20] * 6
-    y_parts = torch.split(y_hat, split_sizes, dim=-1)
-
-    eos_prob = torch.sigmoid(y_parts[0])
-    mixture_weights = stable_softmax(y_parts[1] * (1 + bias), dim=-1)
-    mu_1 = y_parts[2]
-    mu_2 = y_parts[3]
-    std_1 = torch.exp(y_parts[4] - bias)
-    std_2 = torch.exp(y_parts[5] - bias)
-    correlations = torch.tanh(y_parts[6])
-
-    bernoulli_dist = bernoulli.Bernoulli(probs=eos_prob)
-    eos_sample = bernoulli_dist.sample()
-
-    K = torch.multinomial(mixture_weights.squeeze(), 1).squeeze()
-    idx = torch.arange(batch_size, device=y_hat.device)
-
-    mu_k = torch.zeros(batch_size, 2, device=y_hat.device)
-    mu_k[:, 0] = mu_1[idx, K]
-    mu_k[:, 1] = mu_2[idx, K]
-
-    cov = torch.zeros(batch_size, 2, 2, device=y_hat.device)
-    cov[:, 0, 0] = std_1[idx, K].pow(2)
-    cov[:, 1, 1] = std_2[idx, K].pow(2)
-    temp = correlations[idx, K] * std_1[idx, K] * std_2[idx, K]
-    cov[:, 0, 1] = temp
-    cov[:, 1, 0] = temp
-
-    X = torch.randn(batch_size, 2, 1, device=y_hat.device)
-    Z = mu_k + torch.matmul(cov, X).squeeze(-1)
-
-    sample = y_hat.new_zeros(batch_size, 3)
-    sample[:, 0:1] = eos_sample
-    sample[:, 1:] = Z
-    return sample
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, dropout=0.1, max_len=5000):
-        super(PositionalEncoding, self).__init__()
+    """Standard sine/cosine positional embeddings (Vaswani et al., 2017)."""
+
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+        super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float32).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2, dtype=torch.float32) * (-math.log(10000.0) / d_model))
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2, dtype=torch.float32)
+            * (-math.log(10000.0) / d_model)
+        )
         pe[:, 0::2] = torch.sin(position * div_term)
-        if d_model % 2 == 0:
-            pe[:, 1::2] = torch.cos(position * div_term)
-        else:
-            pe[:, 1::2] = torch.cos(position * div_term[:pe[:, 1::2].shape[1]])
-        pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)  # (1, max_len, d_model)
+        self.register_buffer("pe", pe, persistent=False)
 
-    def forward(self, x):
-        x = x + self.pe[:, :x.size(1)]
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Add positional encodings to a batch of sequences (N, T, D)."""
+        x = x + self.pe[:, : x.size(1)]
         return self.dropout(x)
 
+
+def _generate_square_subsequent_mask(sz: int, device: torch.device) -> torch.Tensor:
+    """Causal mask to prevent attention to future positions."""
+    mask = torch.full((sz, sz), float('-inf'), device=device)
+    mask.triu_(1)
+    return mask
+
+
+# --------------------------------------------------------------------------- #
+# 1) Unconditional prediction model
+# --------------------------------------------------------------------------- #
+
 class HandWritingPredictionNet(nn.Module):
-    def __init__(self, hidden_size=128, n_layers=3, output_size=121, input_size=3, max_seq_len=1000):
-        super(HandWritingPredictionNet, self).__init__()
-        self.input_proj = nn.Linear(input_size, hidden_size)
-        self.pos_encoding = PositionalEncoding(hidden_size)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=8)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
-        self.output_layer = nn.Linear(hidden_size, output_size)
+    """Transformer encoder that predicts next-point Mixture-Density params."""
 
-    def forward(self, inputs, initial_hidden=None):
+    def __init__(
+        self,
+        d_model: int = 512,
+        nhead: int = 8,
+        num_layers: int = 6,
+        dim_feedforward: int = 2048,
+        dropout: float = 0.1,
+        input_size: int = 3,
+        output_size: int = 121,
+    ):
+        super().__init__()
+        self.input_proj = nn.Linear(input_size, d_model)
+        self.pos_enc = PositionalEncoding(d_model, dropout)
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            batch_first=True,  # (N, T, D)
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.output_head = nn.Linear(d_model, output_size)
+
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        src_key_padding_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        inputs: FloatTensor (batch, seq_len, 3) - (eos, dx, dy)
+        src_key_padding_mask: BoolTensor (batch, seq_len) - True for padding.
+        """
         x = self.input_proj(inputs)
-        x = self.pos_encoding(x)
-        x = x.transpose(0, 1)
-        seq_len = x.size(0)
-        mask = torch.triu(torch.ones(seq_len, seq_len, device=x.device) * float('-inf'), diagonal=1)
-        x = self.transformer_encoder(x, mask=mask)
-        x = x.transpose(0, 1)
-        y_hat = self.output_layer(x)
-        return y_hat, None
+        x = self.pos_enc(x)
+        x = self.encoder(x, src_key_padding_mask=src_key_padding_mask)
+        y_hat = self.output_head(x)
+        return y_hat
 
-    def init_hidden(self, batch_size, device):
-        return None
+    @torch.no_grad()
+    def generate(
+        self,
+        prime: torch.Tensor,
+        seq_len: int,
+        bias: float,
+    ) -> torch.Tensor:
+        """Autoregressively sample *seq_len* points after *prime*."""
+        generated = []  # list of (B, 1, 3)
 
-    def generate(self, inp, hidden, seq_len, bias, style=None, prime=False):
-        if prime and style is not None:
-            current_seq = style
-        else:
-            current_seq = inp
-        gen_seq = [current_seq]
-        batch_size = inp.size(0)
-        for i in range(seq_len):
-            y_hat, _ = self.forward(current_seq)
-            last_output = y_hat[:, -1, :]
-            next_point = sample_batch_from_out_dist(last_output, bias).unsqueeze(1)
-            current_seq = torch.cat((current_seq, next_point), dim=1)
-            gen_seq.append(next_point)
-            if (next_point[:, 0, 0] > 0.5).all():
-                break
-        gen_seq = torch.cat(gen_seq, dim=1)
-        return gen_seq.detach().cpu().numpy()
+        if prime:
+            pass # TODO: implement priming for unconditional generation
+
+        for _ in range(seq_len):
+            context = torch.cat(generated, dim=1)
+            y_hat = self.forward(context)
+            y_last = y_hat[:, -1, :]
+            z = sample_from_out_dist(y_last.squeeze(), bias)  # (B,1,3)
+            generated.append(z)
+        return torch.cat(generated, dim=1)  # (B, prime+seq_len, 3)
+
+
+# --------------------------------------------------------------------------- #
+# 2) Text-conditioned synthesis model (encoder-decoder Transformer)
+# --------------------------------------------------------------------------- #
 
 class HandWritingSynthesisNet(nn.Module):
-    def __init__(self, hidden_size=128, n_layers=3, output_size=121, window_size=77, max_seq_len=1000):
-        super(HandWritingSynthesisNet, self).__init__()
-        self.input_proj = nn.Linear(3, hidden_size)
-        self.pos_encoding = PositionalEncoding(hidden_size)
-        self.text_embedding = nn.Embedding(window_size, hidden_size)
-        self.text_pos_encoding = PositionalEncoding(hidden_size)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=8)
-        self.text_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
-        decoder_layer = nn.TransformerDecoderLayer(d_model=hidden_size, nhead=8)
-        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=n_layers)
-        self.output_layer = nn.Linear(hidden_size, output_size)
+    """Cross-attention Transformer for text-conditioned handwriting."""
 
-    def init_hidden(self, batch_size, device):
-        return None, None, None
+    def __init__(
+        self,
+        vocab_size: int = 77,
+        d_model: int = 512,
+        nhead: int = 8,
+        num_encoder_layers: int = 6,
+        num_decoder_layers: int = 6,
+        dim_feedforward: int = 2048,
+        dropout: float = 0.1,
+        output_size: int = 121,
+    ):
+        super().__init__()
+        self.d_model = d_model
 
-    def forward(self, inputs, text, text_mask, initial_hidden=None, prev_window_vec=None, prev_kappa=None, is_map=False):
-        tgt = self.input_proj(inputs)
-        tgt = self.pos_encoding(tgt).transpose(0, 1)
-        mem = self.text_embedding(text)
-        mem = self.text_pos_encoding(mem).transpose(0, 1)
-        seq_len = tgt.size(0)
-        tgt_mask = torch.triu(torch.ones(seq_len, seq_len, device=tgt.device) * float('-inf'), diagonal=1)
-        dec_output = self.transformer_decoder(tgt, mem, tgt_mask=tgt_mask)
-        dec_output = dec_output.transpose(0, 1)
-        y_hat = self.output_layer(dec_output)
-        return y_hat, None, None, None
+        # Text encoder
+        self.text_embed = nn.Embedding(vocab_size, d_model)
+        self.text_pos_enc = PositionalEncoding(d_model, dropout)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            batch_first=True,
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
 
-    def generate(self, inp, text, text_mask, prime_text, prime_mask, hidden, window_vector, kappa, bias, is_map=False, prime=False):
-        batch_size = inp.size(0)
-        mem = self.text_embedding(text)
-        mem = self.text_pos_encoding(mem).transpose(0, 1)
-        current_seq = inp
-        gen_seq = [current_seq]
-        for i in range(1000):
-            tgt = self.input_proj(current_seq)
-            tgt = self.pos_encoding(tgt).transpose(0, 1)
-            seq_len = tgt.size(0)
-            tgt_mask = torch.triu(torch.ones(seq_len, seq_len, device=tgt.device) * float('-inf'), diagonal=1)
-            dec_output = self.transformer_decoder(tgt, mem, tgt_mask=tgt_mask)
-            dec_output = dec_output.transpose(0, 1)
-            last_output = dec_output[:, -1, :]
-            y_hat = self.output_layer(last_output)
-            next_point = sample_batch_from_out_dist(y_hat, bias).unsqueeze(1)
-            current_seq = torch.cat((current_seq, next_point), dim=1)
-            gen_seq.append(next_point)
-            if (next_point[:, 0, 0] > 0.5).all():
-                break
-        gen_seq = torch.cat(gen_seq, dim=1)
-        return gen_seq.detach().cpu().numpy()
+        # Stroke decoder
+        self.stroke_proj = nn.Linear(3, d_model)
+        self.stroke_pos_enc = PositionalEncoding(d_model, dropout)
+        decoder_layer = nn.TransformerDecoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            batch_first=True,
+        )
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_decoder_layers)
+        self.output_head = nn.Linear(d_model, output_size)
+
+    def forward(
+        self,
+        stroke_input: torch.Tensor,
+        text: torch.Tensor,
+        stroke_padding_mask: Optional[torch.Tensor] = None,
+        text_padding_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        stroke_input: (batch, T_stroke, 3)
+        text: (batch, T_text)
+        """
+        # Encode text
+        text_emb = self.text_pos_enc(self.text_embed(text) * math.sqrt(self.d_model))
+        memory = self.encoder(text_emb, src_key_padding_mask=text_padding_mask)
+
+        # Prepare stroke target
+        tgt = self.stroke_pos_enc(self.stroke_proj(stroke_input))
+        tgt_mask = _generate_square_subsequent_mask(tgt.size(1), tgt.device)
+
+        dec_out = self.decoder(
+            tgt,
+            memory,
+            tgt_mask=tgt_mask,
+            tgt_key_padding_mask=stroke_padding_mask,
+            memory_key_padding_mask=text_padding_mask,
+        )
+        y_hat = self.output_head(dec_out)
+        return y_hat
+
+    @torch.no_grad()
+    def generate(
+        self,
+        prime: torch.Tensor,
+        text: torch.Tensor,
+        seq_len: int,
+        bias: float,
+    ) -> torch.Tensor:
+        """Generate handwriting sequence conditioned on *text*."""
+        text_pad_mask = None  # assume trimmed
+        memory = self.encoder(
+            self.text_pos_enc(self.text_embed(text) * math.sqrt(self.d_model)),
+            src_key_padding_mask=text_pad_mask,
+        )
+
+        generated = [prime]
+        for _ in range(seq_len):
+            tgt = torch.cat(generated, dim=1)
+            tgt_emb = self.stroke_pos_enc(self.stroke_proj(tgt))
+            tgt_mask = _generate_square_subsequent_mask(tgt_emb.size(1), tgt.device)
+            dec_out = self.decoder(
+                tgt_emb,
+                memory,
+                tgt_mask=tgt_mask,
+                tgt_key_padding_mask=None,
+                memory_key_padding_mask=text_pad_mask,
+            )
+            y_last = self.output_head(dec_out)[:, -1, :]
+            z = sample_from_out_dist(y_last.squeeze(), bias)
+            generated.append(z)
+        return torch.cat(generated, dim=1)
