@@ -217,7 +217,7 @@ def train(
             model, optimizer, epoch, train_loader, device, model_type
         )
 
-        print("validation....")
+        # print("validation....")
         # valid_loss = validation(model, valid_loader, device, epoch, model_type)
 
         train_losses.append(train_loss)
@@ -325,7 +325,14 @@ if __name__ == "__main__":
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
     sample_batch = next(iter(train_loader))
-    print("sample batch", sample_batch[0])
+    single_sample = sample_batch[0]
+    with open(args.save_path + "sample.txt", "w") as f:
+        sample_shape = single_sample.shape
+        f.write("Single sample shape: {}\n".format(sample_shape))
+        for i, stroke in enumerate(single_sample):
+            f.write("Stroke {}:\n".format(i))
+            for j, point in enumerate(stroke):
+                f.write("\tPoint {}: {}\n".format(j, point))
 
     if model_type == "prediction":
         model = HandWritingPredictionNet(

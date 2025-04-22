@@ -61,7 +61,7 @@ def parse_xml_file(xml_path):
     
     Each stroke in the XML is represented as a series of absolute (x, y) points.
     This function converts them into a sequence where each timestep is a vector [flag, dx, dy]:
-      - For the very first stroke: the first point’s displacement is taken as is,
+      - For the very first stroke: the first point's displacement is taken as is,
         and subsequent points are differences between consecutive points.
       - For each subsequent stroke: the first point is computed as the difference between
         its absolute coordinate and the last point of the previous stroke (flagged with 1 to indicate a pen lift),
@@ -86,8 +86,6 @@ def parse_xml_file(xml_path):
             continue
 
         if current_last_point is None:
-            # First stroke: use the first point as the starting coordinate.
-            sequence.append([0, points[0][0], points[0][1]])
             for i in range(1, len(points)):
                 dx = points[i][0] - points[i-1][0]
                 dy = points[i][1] - points[i-1][1]
@@ -158,19 +156,12 @@ def main():
         strokes_list.append(stroke_data)
         sentences.append(latex_expression)
     
-    # normalized_strokes_list = []
-    # for stroke in strokes_list:
-    #     _, _, norm_stroke = data_normalization(stroke)
-    #     normalized_strokes_list.append(norm_stroke)
-
-    # manually normalize literally everything
-    # max_xy = np.array([0, 0])
-    # min_xy = np.array([0, 0])
-    # for stroke in strokes_list:
-    #     max_xy = np.maximum(max_xy, stroke[:, 1:].max(axis=0))
-    #     min_xy = np.minimum(min_xy, stroke[:, 1:].min(axis=0))
-    # for i, stroke in enumerate(strokes_list):
-    #     strokes_list[i][:, 1:] /= (max_xy - min_xy)
+    # shift every stroke to be centered
+    for i, stroke in enumerate(strokes_list):
+        mean_x = stroke[:, 1].mean()
+        mean_y = stroke[:, 2].mean()
+        strokes_list[i][:, 1] -= mean_x
+        strokes_list[i][:, 2] -= mean_y
 
     # normalize but with the same scaling on x and y
     for i, stroke in enumerate(strokes_list):
