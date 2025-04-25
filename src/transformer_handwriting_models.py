@@ -219,7 +219,7 @@ class HandWritingSynthesisNet(nn.Module):
 
         # Text encoder
         self.text_embed = nn.Embedding(vocab_size, d_model)
-        self.text_pos_enc = PositionalEncoding(d_model, dropout)
+        self.text_pos_enc = PositionalEncoding(d_model, dropout) 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
             nhead=nhead,

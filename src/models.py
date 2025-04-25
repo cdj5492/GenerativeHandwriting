@@ -89,7 +89,7 @@ def sample_batch_from_out_dist(y_hat, bias):
     sample[:, 0, 1:] = Z.squeeze()
     return sample
 
-
+# purely autoregressive model with LSTM
 class HandWritingPredictionNet(nn.Module):
 
     def __init__(self, hidden_size=400, n_layers=3, output_size=121, input_size=3):
@@ -185,6 +185,7 @@ class HandWritingPredictionNet(nn.Module):
         return gen_seq
 
 
+# encoder-decoder model with LSTM (this one works better)
 class HandWritingSynthesisNet(nn.Module):
 
     def __init__(self, hidden_size=400, n_layers=3, output_size=121, window_size=77):
@@ -208,7 +209,7 @@ class HandWritingSynthesisNet(nn.Module):
             3 + self.vocab_size + hidden_size, hidden_size, batch_first=True
         )
 
-        self.window_layer = nn.Linear(hidden_size, 3 * K)
+        self.window_layer = nn.Linear(hidden_size, 3 * K) # uses a windowing encoder
         self.output_layer = nn.Linear(n_layers * hidden_size, output_size)
         # self.init_weight()
 

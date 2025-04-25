@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 
 from models import HandWritingPredictionNet, HandWritingSynthesisNet
 # from transformer_handwriting_models import HandWritingPredictionNet, HandWritingSynthesisNet
-from utils import plot_stroke
+from utils import plot_stroke, visualize_mdn_overlay
 from utils.constants import Global
 from utils.dataset import HandwritingDataset, MathHandwritingDataset
 from utils.model_utils import compute_nll_loss
@@ -36,7 +36,7 @@ def argparser():
     parser.add_argument("--step_size", type=int, default=100)
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.001)
-    parser.add_argument("--patience", type=int, default=1500)
+    parser.add_argument("--patience", type=int, default=50)
     parser.add_argument("--model_type", type=str, default="prediction")
     parser.add_argument("--data_path", type=str, default="./data/")
     parser.add_argument("--save_path", type=str, default="./logs/")
@@ -179,8 +179,10 @@ def train(
 
     # if the modelfile doesn't exist, create it
     if not os.path.exists(model_path):
+        print("creating new model")
         torch.save(model.state_dict(), model_path)
     else:
+        print("loading existing model")
         model.load_state_dict(torch.load(model_path))
 
     # generate one before training for visualization
@@ -208,7 +210,7 @@ def train(
     # plot the sequence
     plot_stroke(
         gen_seq[0],
-        save_name=save_path + model_type + "_seq_" + str(best_epoch) + ".png",
+        save_name=save_path + "/" + model_type + "/" + model_type + "_seq_" + str(best_epoch) + ".png",
     )
 
     for epoch in range(n_epochs):
@@ -217,21 +219,31 @@ def train(
             model, optimizer, epoch, train_loader, device, model_type
         )
 
-        # print("validation....")
-        # valid_loss = validation(model, valid_loader, device, epoch, model_type)
+        print("validation....")
+        valid_loss = validation(model, valid_loader, device, epoch, model_type)
 
         train_losses.append(train_loss)
-        # valid_losses.append(valid_loss)
+        valid_losses.append(valid_loss)
 
         print("Epoch {}: Train: avg. loss: {:.3f}".format(epoch + 1, train_loss))
-        # print("Epoch {}: Valid: avg. loss: {:.3f}".format(epoch + 1, valid_loss))
+        print("Epoch {}: Valid: avg. loss: {:.3f}".format(epoch + 1, valid_loss))
+
+        # save a continuiously updating loss graph
+        plt.plot(train_losses, label="train")
+        plt.plot(valid_losses, label="valid")
+        plt.legend()
+        plt.xlabel("epoch")
+        plt.ylabel("loss")
+        plt.title("Loss vs. Epoch")
+        plt.savefig(save_path + "/" + model_type + "/" + model_type + "_loss.png")
+        plt.close()
 
         if step_size != -1:
             scheduler.step()
 
-        # if valid_loss < best_loss:
-        if True:
-            # best_loss = valid_loss
+        # if True:
+        if valid_loss < best_loss:
+            best_loss = valid_loss
             best_epoch = epoch + 1
             print("Saving best model at epoch {}".format(epoch + 1))
             torch.save(model.state_dict(), model_path)
@@ -264,7 +276,7 @@ def train(
                 # )
                 plt.margins(0.2)
                 plt.subplots_adjust(bottom=0.15)
-                plt.savefig(save_path + "heat_map" + str(best_epoch) + ".png")
+                plt.savefig(save_path + "/" + model_type + "/" + "heat_map" + str(best_epoch) + ".png")
                 plt.close()
             # denormalize the generated offsets using train set mean and std
             gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
@@ -272,8 +284,22 @@ def train(
             # plot the sequence
             plot_stroke(
                 gen_seq[0],
-                save_name=save_path + model_type + "_seq_" + str(best_epoch) + ".png",
+                save_name=save_path + "/" + model_type + "/" + model_type + "_seq_" + str(best_epoch) + ".png",
             )
+
+            if model_type == "prediction":
+                # run the model once to get the full y_hat tensor
+                seq_tensor = torch.from_numpy(gen_seq).float().to(device)
+                with torch.no_grad():
+                    init_h = model.init_hidden(1, device)
+                    y_hat_full, _ = model.forward(seq_tensor, init_h)
+
+                visualize_mdn_overlay(
+                    gen_seq[0],
+                    y_hat_full,
+                    save_path + "/" + model_type + "/" + "mdn_overlay_" + str(best_epoch) + ".png",
+                )
+
             k = 0
         elif k > patience:
             print("Best model was saved at epoch: {}".format(best_epoch))
@@ -303,6 +329,7 @@ if __name__ == "__main__":
 
     # Load the data and text
     train_dataset = MathHandwritingDataset(
+    # train_dataset = HandwritingDataset(
         args.data_path,
         split="train",
         text_req=args.text_req,
@@ -310,6 +337,7 @@ if __name__ == "__main__":
         data_aug=args.data_aug,
     )
     valid_dataset = MathHandwritingDataset(
+    # valid_dataset = HandwritingDataset(
         args.data_path,
         split="valid",
         text_req=args.text_req,

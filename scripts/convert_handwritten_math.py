@@ -131,7 +131,9 @@ def main():
     # base_dir = 'data/raw/consolidated_math'
 
     # base_dir = 'AndyStuff/output_sessions/session_20250420_152042'
-    base_dir = 'data/raw/consolidated_math'
+    # base_dir = 'data/raw/consolidated_math'
+    # base_dir = 'data/raw/cleaned_up_math'
+    base_dir = 'data/raw/fractions_removed_1100'
     base_dir = os.path.abspath(base_dir)
     mapping_path = os.path.join(base_dir, 'mapping.csv')
     xml_dir = os.path.join(base_dir, 'xml')
@@ -157,11 +159,11 @@ def main():
         sentences.append(latex_expression)
     
     # shift every stroke to be centered
-    for i, stroke in enumerate(strokes_list):
-        mean_x = stroke[:, 1].mean()
-        mean_y = stroke[:, 2].mean()
-        strokes_list[i][:, 1] -= mean_x
-        strokes_list[i][:, 2] -= mean_y
+    # for i, stroke in enumerate(strokes_list):
+    #     mean_x = stroke[:, 1].mean()
+    #     mean_y = stroke[:, 2].mean()
+    #     strokes_list[i][:, 1] -= mean_x
+    #     strokes_list[i][:, 2] -= mean_y
 
     # normalize but with the same scaling on x and y
     for i, stroke in enumerate(strokes_list):

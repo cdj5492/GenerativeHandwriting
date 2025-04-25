@@ -150,35 +150,116 @@ class HandwritingDataset(Dataset):
 
 # --- Define Tokenizer Mappings ---
 # Using class attributes for better organization within the Dataset
+# TOKEN_TO_ID = {
+#     '\\infty': 1, '\\ldots': 2, '\\times': 3, '\\theta': 4, '\\alpha': 5,
+#     '\\gamma': 6, '\\lambda': 7, '\\sigma': 8, '\\cdot': 9, '\\frac{': 10,
+#     '\\sqrt{': 11, '\\log_': 12, '\\neq': 13, '\\beta': 14, '\\phi': 15,
+#     '\\div': 16, '\\geq': 17, '\\leq': 18, '\\sin': 19, '\\cos': 20,
+#     '\\tan': 21, '\\mu': 22, '\\pi': 23, '\\pm': 24, '^{': 25,
+#     '_{': 26, '(': 27, ')': 28, '{': 29, # Removed '}' : 30
+#     '^': 31, '_': 32, '=': 33, '+': 34, '-': 35, '!': 36, '>': 37, '<': 38,
+#     ' ': 39,  # Note: The tokenizer function skips spaces by default now
+#     '0': 40, '1': 41, '2': 42, '3': 43, '4': 44, '5': 45, '6': 46, '7': 47,
+#     '8': 48, '9': 49, 'A': 50, 'B': 51, 'C': 52, 'D': 53, 'E': 54, 'F': 55,
+#     'G': 56, 'H': 57, 'L': 58, 'M': 59, 'N': 60, 'P': 61, 'R': 62, 'S': 63,
+#     'T': 64, 'V': 65, 'X': 66, 'Y': 67, 'a': 68, 'b': 69, 'c': 70, 'd': 71,
+#     'e': 72, 'f': 73, 'g': 74, 'h': 75, 'i': 76, 'j': 77, 'k': 78, 'l': 79,
+#     'm': 80, 'n': 81, 'o': 82, 'p': 83, 'q': 84, 'r': 85, 's': 86, 't': 87,
+#     'u': 88, 'v': 89, 'w': 90, 'x': 91, 'y': 92, 'z': 93,
+# }
 TOKEN_TO_ID = {
-    '\\infty': 1, '\\ldots': 2, '\\times': 3, '\\theta': 4, '\\alpha': 5,
-    '\\gamma': 6, '\\lambda': 7, '\\sigma': 8, '\\cdot': 9, '\\frac{': 10,
-    '\\sqrt{': 11, '\\log_': 12, '\\neq': 13, '\\beta': 14, '\\phi': 15,
-    '\\div': 16, '\\geq': 17, '\\leq': 18, '\\sin': 19, '\\cos': 20,
-    '\\tan': 21, '\\mu': 22, '\\pi': 23, '\\pm': 24, '^{': 25,
-    '_{': 26, '(': 27, ')': 28, '{': 29, # Removed '}' : 30
-    '^': 31, '_': 32, '=': 33, '+': 34, '-': 35, '!': 36, '>': 37, '<': 38,
-    ' ': 39,  # Note: The tokenizer function skips spaces by default now
-    '0': 40, '1': 41, '2': 42, '3': 43, '4': 44, '5': 45, '6': 46, '7': 47,
-    '8': 48, '9': 49, 'A': 50, 'B': 51, 'C': 52, 'D': 53, 'E': 54, 'F': 55,
-    'G': 56, 'H': 57, 'L': 58, 'M': 59, 'N': 60, 'P': 61, 'R': 62, 'S': 63,
-    'T': 64, 'V': 65, 'X': 66, 'Y': 67, 'a': 68, 'b': 69, 'c': 70, 'd': 71,
-    'e': 72, 'f': 73, 'g': 74, 'h': 75, 'i': 76, 'j': 77, 'k': 78, 'l': 79,
-    'm': 80, 'n': 81, 'o': 82, 'p': 83, 'q': 84, 'r': 85, 's': 86, 't': 87,
-    'u': 88, 'v': 89, 'w': 90, 'x': 91, 'y': 92, 'z': 93,
-    # Add <PAD>, <SOS>, <EOS>, <UNK> tokens if needed for your model
-    '<PAD>': 0,   # Example: Padding token ID
-    '<SOS>': 94,  # Example: Start Of Sequence
-    '<EOS>': 95,  # Example: End Of Sequence
-    '<UNK>': 96   # Example: Unknown Token
+    '\\frac{'  : 0,
+    '\\sqrt{'  : 1,
+    '\\times'  : 2,
+    '\\neq'    : 3,
+    '\\geq'    : 4,
+    '\\leq'    : 5,
+    '\\pi'     : 6,
+    '^{'       : 7,
+    '_{'       : 8,
+    '('        : 9,
+    ')'        : 10,
+    '^'        : 11,
+    '_'        : 12,
+    '='        : 13,
+    '+'        : 14,
+    '-'        : 15,
+    '>'        : 16,
+    '<'        : 17,
+    '0'        : 18,
+    '1'        : 19,
+    '2'        : 20,
+    '3'        : 21,
+    '4'        : 22,
+    '5'        : 23,
+    '6'        : 24,
+    '7'        : 25,
+    '8'        : 26,
+    '9'        : 27,
+    'A'        : 28,
+    'B'        : 29,
+    'C'        : 30,
+    'D'        : 31,
+    'E'        : 32,
+    'F'        : 33,
+    'G'        : 34,
+    'H'        : 35,
+    'I'        : 36,
+    'J'        : 37,
+    'K'        : 38,
+    'L'        : 39,
+    'M'        : 40,
+    'N'        : 41,
+    'O'        : 42,
+    'P'        : 43,
+    'Q'        : 44,
+    'R'        : 45,
+    'S'        : 46,
+    'T'        : 47,
+    'U'        : 48,
+    'V'        : 49,
+    'W'        : 50,
+    'X'        : 51,
+    'Y'        : 52,
+    'Z'        : 53,
+    'a'        : 54,
+    'b'        : 55,
+    'c'        : 56,
+    'd'        : 57,
+    'e'        : 58,
+    'f'        : 59,
+    'g'        : 60,
+    'h'        : 61,
+    'i'        : 62,
+    'j'        : 63,
+    'k'        : 64,
+    'l'        : 65,
+    'm'        : 66,
+    'n'        : 67,
+    'o'        : 68,
+    'p'        : 69,
+    'q'        : 70,
+    'r'        : 71,
+    's'        : 72,
+    't'        : 73,
+    'u'        : 74,
+    'v'        : 75,
+    'w'        : 76,
+    'x'        : 77,
+    'y'        : 78,
+    'z'        : 79,
+    '<PAD>'    : 80,
+    '<SOS>'    : 81,
+    '<EOS>'    : 82,
+    '<UNK>'    : 83
 }
 
 CONTEXTUAL_CLOSING_BRACES = {
-    '\\frac{': 100,  # ID for closing brace of fraction numerator
-    '{': 101,        # ID for closing brace of fraction denominator
-    '\\sqrt{': 102,  # ID for closing brace of square root
-    '_{': 103,       # ID for closing brace of subscript
-    '^{': 104        # ID for closing brace of exponent
+    '\\frac{': 84,  # ID for closing brace of fraction numerator
+    '{': 85,        # ID for closing brace of fraction denominator
+    '\\sqrt{': 86,  # ID for closing brace of square root
+    '_{': 87,       # ID for closing brace of subscript
+    '^{': 88        # ID for closing brace of exponent
 }
 
 
@@ -207,8 +288,8 @@ class MathHandwritingDataset(Dataset):
     id_to_context = ID_TO_CONTEXT
     sorted_tokens = SORTED_TOKENS
     vocab_size = VOCAB_SIZE
-    pad_token_id = TOKEN_TO_ID.get('<PAD>', 0)
-    unk_token_id = TOKEN_TO_ID.get('<UNK>', 96) # Default UNK id
+    pad_token_id = TOKEN_TO_ID.get('<PAD>', 80)
+    unk_token_id = TOKEN_TO_ID.get('<UNK>', 83) # Default UNK id
     # ---
 
     def __init__(self, data_path, split='train', text_req=False, debug=False, max_seq_len=300, data_aug=False):
