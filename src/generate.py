@@ -161,7 +161,7 @@ def generate_conditional_sequence(
 
         # Tokenize the priming text using the dataset's method
         # The result is a list of token IDs
-        token_id_list = dataset.char_to_idx(real_text)
+        token_id_list = dataset.char_to_idx(real_text).tolist()
         if not token_id_list:
              print("Warning: Priming text resulted in empty token list.")
              # Handle this case: maybe raise error, or create a dummy tensor?
@@ -187,7 +187,7 @@ def generate_conditional_sequence(
     # Tokenize the target text sequence using the dataset's method
     # Note: Removed adding "  " - rely on tokenizer/model to handle EOS if needed
     # If EOS is required, add it explicitly: dataset.char_to_idx(char_seq + dataset.id_to_token[dataset.eos_token_id])
-    target_token_id_list = dataset.char_to_idx(char_seq)
+    target_token_id_list = dataset.char_to_idx(char_seq).tolist()
     if not target_token_id_list:
         print(f"Warning: Input text '{char_seq}' resulted in empty token list. Using a PAD token.")
         target_token_id_list = [dataset.pad_token_id] # Use padding token ID

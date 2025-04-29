@@ -328,16 +328,16 @@ if __name__ == "__main__":
     n_epochs = args.n_epochs
 
     # Load the data and text
-    train_dataset = MathHandwritingDataset(
-    # train_dataset = HandwritingDataset(
+    # train_dataset = MathHandwritingDataset(
+    train_dataset = HandwritingDataset(
         args.data_path,
         split="train",
         text_req=args.text_req,
         debug=args.debug,
         data_aug=args.data_aug,
     )
-    valid_dataset = MathHandwritingDataset(
-    # valid_dataset = HandwritingDataset(
+    # valid_dataset = MathHandwritingDataset(
+    valid_dataset = HandwritingDataset(
         args.data_path,
         split="valid",
         text_req=args.text_req,
