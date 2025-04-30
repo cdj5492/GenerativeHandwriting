@@ -23,9 +23,9 @@ def argparser():
     parser.add_argument(
         "--model_path",
         type=Path,
-        default="./results/synthesis/best_model_synthesis_3.pt",
+        default="./logs/best_model_synthesis.pt",
     )
-    parser.add_argument("--save_path", type=Path, default="./results/")
+    parser.add_argument("--save_path", type=Path, default="./logs/")
     parser.add_argument("--seq_len", type=int, default=400)
     parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument("--bias", type=float, default=10.0, help="bias")
@@ -34,7 +34,7 @@ def argparser():
     parser.add_argument("--prime", action="store_true")
     parser.add_argument("--is_map", action="store_true")
     parser.add_argument("--seed", type=int, help="random seed")
-    parser.add_argument("--data_path", type=str, default="./data/")
+    parser.add_argument("--data_path", type=str, default="./data/raw/single_character_only_data_532/")
     parser.add_argument("--file_path", type=str, help="./app/")
     args = parser.parse_args()
 
@@ -343,17 +343,16 @@ if __name__ == "__main__":
         )
     elif model == "synthesis":
         gen_seq, phi = generate_conditional_sequence(
-            model_path,
-            args.char_seq,
-            device,
-            train_dataset.char_to_id,
-            train_dataset.idx_to_char,
-            args.bias,
-            args.prime,
-            style,
-            real_text,
-            args.is_map,
-            args.batch_size,
+            model_path=model_path,
+            char_seq=args.char_seq,
+            device=device,
+            dataset=train_dataset,
+            bias=args.bias,
+            prime=args.prime,
+            prime_seq=style,
+            real_text=real_text,
+            is_map=args.is_map,
+            model_arch='lstm'
         )
         if args.is_map:
             plt.imshow(phi, cmap="viridis", aspect="auto")

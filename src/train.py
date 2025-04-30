@@ -190,6 +190,10 @@ def train(
         print("loading existing model")
         model.load_state_dict(torch.load(model_path))
 
+    # if the synthesis or prediction folders don't exist, create them
+    if not os.path.exists(save_path + "/" + model_type):
+        os.makedirs(save_path + "/" + model_type)
+
     # generate one before training for visualization
     if model_type == "prediction":
         gen_seq = generate_unconditional_seq(
@@ -333,16 +337,16 @@ if __name__ == "__main__":
     n_epochs = args.n_epochs
 
     # Load the data and text
-    # train_dataset = MathHandwritingDataset(
-    train_dataset = HandwritingDataset(
+    train_dataset = MathHandwritingDataset(
+    # train_dataset = HandwritingDataset(
         args.data_path,
         split="train",
         text_req=args.text_req,
         debug=args.debug,
         data_aug=args.data_aug,
     )
-    # valid_dataset = MathHandwritingDataset(
-    valid_dataset = HandwritingDataset(
+    valid_dataset = MathHandwritingDataset(
+    # valid_dataset = HandwritingDataset(
         args.data_path,
         split="valid",
         text_req=args.text_req,

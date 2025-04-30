@@ -135,7 +135,8 @@ def main():
     # base_dir = 'data/raw/cleaned_up_math'
     # base_dir = 'data/raw/fractions_removed_1100'
     # base_dir = 'data/raw/simplified_data_630'
-    base_dir = 'data/raw/consolidated_1523'
+    # base_dir = 'data/raw/consolidated_1523'
+    base_dir = 'data/raw/single_character_only_data_532'
     base_dir = os.path.abspath(base_dir)
     mapping_path = os.path.join(base_dir, 'mapping.csv')
     xml_dir = os.path.join(base_dir, 'xml')
@@ -144,7 +145,7 @@ def main():
     sentences = []     # To collect corresponding LaTeX expressions
     
     # Read the mapping CSV
-    with open(mapping_path, newline='', encoding='utf-8') as csvfile:
+    with open(mapping_path, newline='', encoding='utf-8-sig') as csvfile:
         reader = csv.DictReader(csvfile)
         mappings = list(reader)
     

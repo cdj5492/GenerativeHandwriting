@@ -281,6 +281,9 @@ class HandWritingSynthesisNet(nn.Module):
         self.dropout = dropout
         self.window_size = window_size
 
+        # end of sequence
+        self.EOS = False
+
         # Text Encoding Path
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         # Use the modified PositionalEncoding
@@ -334,6 +337,9 @@ class HandWritingSynthesisNet(nn.Module):
 
         # phi shape: [batch, text_len]
         phi = torch.sum(alpha_unsqueezed * torch.exp(exponent), dim=2)
+
+        if phi[0, -1] > torch.max(phi[0, :-1]):
+            self.EOS = True
 
         if text_mask is not None:
              phi = phi * text_mask # Apply mask
@@ -482,6 +488,8 @@ class HandWritingSynthesisNet(nn.Module):
             prime_seq_len = inp.shape[1]
             print(f"Priming with sequence of length {prime_seq_len}...")
 
+            self.EOS = False
+
             # Encode priming text (batch first) - not strictly needed unless attention uses it
             # embedded_prime_text = self.embedding(prime_text) * math.sqrt(self.embedding_dim)
             # embedded_prime_text_pos = self.pos_encoder(embedded_prime_text) # Batch first
@@ -545,7 +553,8 @@ class HandWritingSynthesisNet(nn.Module):
         finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
         steps_taken = 0
 
-        while steps_taken < max_len and not torch.all(finished):
+        while steps_taken < max_len and not self.EOS:
+        # for _ in range(max_len):
             stroke_input_t = inp.squeeze(1) # [batch, 3]
 
             # Calculate window vector using TARGET text encoding
@@ -580,10 +589,6 @@ class HandWritingSynthesisNet(nn.Module):
 
             # Sample next point
             next_inp = sample_batch_from_out_dist(y_hat_t, bias) # [batch, 1, 3]
-
-            # Update finished flags
-            current_eos = (next_inp[:, 0, 0] == 1.0)
-            finished = finished | current_eos
 
             # Append the point that was *input* to this step
             gen_seq.append(inp) # inp shape [batch, 1, 3]
