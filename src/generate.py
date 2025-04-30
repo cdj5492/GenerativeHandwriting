@@ -70,7 +70,7 @@ def generate_unconditional_seq(model_path, seq_len, device, bias, style, prime, 
     print("Generating sequence....")
 
     if model_arch == 'transformer':
-        gen_seq = model.generate(prime, seq_len, bias)
+        gen_seq = model.generate(prime, seq_len, bias, device, batch_size=1)
     else:
         initial_hidden = model.init_hidden(batch_size, device)
         gen_seq = model.generate(inp, initial_hidden, seq_len, bias, style, prime)

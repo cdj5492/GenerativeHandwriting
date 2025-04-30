@@ -177,23 +177,59 @@ class HandWritingPredictionNet(nn.Module):
     @torch.no_grad()
     def generate(
         self,
-        prime: torch.Tensor,
+        prime: torch.Tensor, # Note: prime handling is still a TODO
         seq_len: int,
         bias: float,
+        # Add device parameter for creating the initial tensor
+        device: Optional[torch.device] = None,
+        batch_size: int = 1 # Assuming batch size 1 for generation if not specified
     ) -> torch.Tensor:
         """Autoregressively sample *seq_len* points after *prime*."""
-        generated = []  # list of (B, 1, 3)
+        
+        if device is None:
+             # Try to infer device from model parameters if not provided
+             device = next(self.parameters()).device
 
-        if prime:
-            pass # TODO: implement priming for unconditional generation
+        if prime is not None and prime is not False: # Check if prime is a tensor
+             generated = [prime.to(device)]
+             current_batch_size = prime.shape[0]
+             # Ensure prime has the correct shape (B, T, 3)
+             if prime.dim() != 3 or prime.shape[-1] != 3:
+                  raise ValueError("Prime tensor must have shape (batch_size, sequence_length, 3)")
 
+        else:
+             # Start with a beginning-of-sequence token (e.g., zeros)
+             # Shape: (batch_size, 1, 3) -> (eos=0, dx=0, dy=0)
+             initial_point = torch.zeros((batch_size, 1, 3), device=device)
+             generated = [initial_point]
+             current_batch_size = batch_size
+
+
+        # Autoregressive loop
         for _ in range(seq_len):
-            context = torch.cat(generated, dim=1)
+            # Concatenate the points generated so far to form the context
+            context = torch.cat(generated, dim=1) # Now 'generated' is not empty
+            
+            # Get model prediction for the next point based on context
             y_hat = self.forward(context)
-            y_last = y_hat[:, -1, :]
-            z = sample_from_out_dist(y_last.squeeze(), bias)  # (B,1,3)
+            
+            # Extract the prediction for the *last* time step
+            y_last = y_hat[:, -1, :] # Shape (batch_size, output_size)
+
+            # Sample the next point based on the prediction distribution
+            # Ensure sample_batch_from_out_dist can handle batch input
+            # Assuming sample_batch_from_out_dist returns shape (batch_size, 1, 3)
+            z = sample_batch_from_out_dist(y_last, bias)
+            
+            # Append the newly generated point
             generated.append(z)
-        return torch.cat(generated, dim=1)  # (B, prime+seq_len, 3)
+
+        # Concatenate all generated points (excluding the initial if it was just a placeholder)
+        # If we started with a placeholder zero, we might want to skip it in the final output,
+        # depending on whether it represents a real starting point or just context.
+        # If the initial_point was just for context, return torch.cat(generated[1:], dim=1)
+        # Otherwise, if it's part of the sequence:
+        return torch.cat(generated, dim=1) # Shape: (batch_size, initial_len + seq_len, 3)
 
 
 # --------------------------------------------------------------------------- #

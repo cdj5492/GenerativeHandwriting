@@ -154,6 +154,8 @@ def train(model, train_loader, valid_loader, args, device):
     os.makedirs(synth_plot_dir, exist_ok=True)
     # --- END ADDITION ---
 
+    train_losses = []
+    valid_losses = []
     best_loss, best_epoch = float("inf"), 0
 
     # if the modelfile doesn't exist, create it (using the new path)
@@ -171,7 +173,7 @@ def train(model, train_loader, valid_loader, args, device):
         gen_seq = generate_unconditional_seq(
             model_path=model_save_path, seq_len=700, device=device, bias=10.0, style=None, prime=False
         )
-        gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
+        gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq.cpu().numpy())
         initial_plot_path = os.path.join(pred_plot_dir, "initial_prediction.png")
         plot_stroke(
             gen_seq[0],
@@ -207,8 +209,20 @@ def train(model, train_loader, valid_loader, args, device):
                              optimiser, device, False, args.model_type)
         scheduler.step()
 
+        train_losses.append(tr_loss)
+        valid_losses.append(val_loss)
+
         print(f"Epoch {epoch:3d}: train={tr_loss:.4f}  valid={val_loss:.4f} "
               f"lr={scheduler.get_last_lr()[0]:.2e}")
+
+        # save a continuously updating loss graph
+        plt.plot(train_losses, label="train")
+        plt.plot(valid_losses, label="valid")
+        plt.legend()
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.savefig(os.path.join(args.save_path, f"loss_{args.model_type}.png"))
+        plt.close()
 
         # periodic plotting for debug
         # --- MODIFIED: Use new plot directories ---
@@ -219,7 +233,7 @@ def train(model, train_loader, valid_loader, args, device):
                 seq_len=700, device=device, bias=10.0,
                 style=None, prime=False
             )
-            gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
+            gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq.cpu().numpy())
             plot_stroke(
                 gen_seq[0],
                 save_name=os.path.join(pred_plot_dir, 'pred_epoch%d.png' % epoch) # Save to t_prediction subdir
