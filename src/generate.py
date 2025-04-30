@@ -134,7 +134,14 @@ def generate_conditional_sequence(
     if model_arch == 'transformer':
         model = TransformerHandWritingSynthesisNet(window_size=dataset.vocab_size)
     else:
-        model = HandWritingSynthesisNet(window_size=dataset.vocab_size)
+        model = HandWritingSynthesisNet(
+            # Make sure these match how the model was trained/saved
+            hidden_size=400, # Or load from config/args if variable
+            n_layers=3,      # Or load from config/args if variable
+            output_size=121, # Or load from config/args if variable
+            vocab_size=dataset.vocab_size,
+            # nhead=8, transformer_layers=2, dropout=0.1 # Add if needed
+        )
     print(f"Using vocab size from dataset: {dataset.vocab_size}")
 
     # Load the best model
@@ -216,20 +223,19 @@ def generate_conditional_sequence(
             # )
     else:
         # --- Initialize Model State ---
-        hidden, window_vector, kappa = model.init_hidden(batch_size, device)
+        hidden, context = model.init_hidden(batch_size, device)
         with torch.no_grad(): # Ensure gradients are not computed during generation
             gen_seq = model.generate(
-                inp=inp,                    # Initial stroke input (prime_seq or zeros)
-                text=text_tensor,           # Target text token IDs
-                text_mask=text_mask,        # Mask for target text
+                inp=inp,                      # Initial stroke input
+                text=text_tensor,             # Target text token IDs
+                text_mask=text_mask,          # Mask for target text
                 prime_text=prime_text_tensor, # Priming text token IDs (or None)
-                prime_mask=prime_mask,      # Mask for priming text (or None)
-                hidden=hidden,              # Initial hidden state
-                window_vector=window_vector,# Initial window vector for attention
-                kappa=kappa,                # Initial kappa for attention
-                bias=bias,                  # Sampling bias
-                is_map=is_map,              # MAP flag
-                prime=prime,                # Priming flag passed to model's generate
+                prime_mask=prime_mask,        # Mask for priming text (or None)
+                hidden=hidden,                # Initial/current hidden state
+                context=context,              # Initial/current context vector << ADD
+                bias=bias,                    # Sampling bias
+                prime=prime,                  # Priming flag
+                # max_len=1500 # Optionally add max_len if needed
             )
 
     # --- Decode Input Text for Verification ---

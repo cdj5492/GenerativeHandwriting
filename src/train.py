@@ -72,9 +72,10 @@ def train_epoch(model, optimizer, epoch, train_loader, device, model_type):
             initial_hidden = model.init_hidden(batch_size, device)
             y_hat, state = model.forward(inputs, initial_hidden)
         else:
-            initial_hidden, window_vector, kappa = model.init_hidden(batch_size, device)
-            y_hat, state, window_vector, kappa = model.forward(
-                inputs, text, text_mask, initial_hidden, window_vector, kappa
+            initial_hidden, initial_context = model.init_hidden(batch_size, device) # Get initial context
+            # Pass the initial context for the start of the sequence
+            y_hat, final_states, _ = model.forward( # We might not need the last context here
+                inputs, text, text_mask, initial_hidden, initial_context
             )
 
         loss = compute_nll_loss(targets, y_hat, mask)
@@ -88,10 +89,13 @@ def train_epoch(model, optimizer, epoch, train_loader, device, model_type):
         if model_type == "prediction":
             nn.utils.clip_grad_value_(model.parameters(), 10)
         else:
+            nn.utils.clip_grad_value_(model.embedding.parameters(), 10) # Clip embedding
             nn.utils.clip_grad_value_(model.lstm_1.parameters(), 10)
             nn.utils.clip_grad_value_(model.lstm_2.parameters(), 10)
             nn.utils.clip_grad_value_(model.lstm_3.parameters(), 10)
-            nn.utils.clip_grad_value_(model.window_layer.parameters(), 10)
+            # nn.utils.clip_grad_value_(model.transformer_encoder.parameters(), 10) # Clip transformer
+            # Note: Clipping output_layer gradients might also be useful
+            nn.utils.clip_grad_value_(model.output_layer.parameters(), 10)
 
         optimizer.step()
         avg_loss += loss.item()
@@ -129,11 +133,12 @@ def validation(model, valid_loader, device, epoch, model_type):
                 initial_hidden = model.init_hidden(batch_size, device)
                 y_hat, state = model.forward(inputs, initial_hidden)
             else:
-                initial_hidden, window_vector, kappa = model.init_hidden(
+                initial_hidden, initial_context = model.init_hidden(
                     batch_size, device
                 )
-                y_hat, state, window_vector, kappa = model.forward(
-                    inputs, text, text_mask, initial_hidden, window_vector, kappa
+                # Pass the initial context for the start of the sequence
+                y_hat, final_states, _ = model.forward( # Might not need last context here
+                    inputs, text, text_mask, initial_hidden, initial_context
                 )
 
             loss = compute_nll_loss(targets, y_hat, mask)
@@ -200,7 +205,7 @@ def train(
             prime=False,
             prime_seq=None,
             real_text=None,
-            is_map=True,
+            is_map=False,
             model_arch='lstm',
         )
 
@@ -262,22 +267,22 @@ def train(
                     prime=False,
                     prime_seq=None,
                     real_text=None,
-                    is_map=True,
+                    is_map=False,
                     model_arch='lstm',
                 )
 
-                plt.imshow(phi, cmap="viridis", aspect="auto")
-                plt.colorbar()
-                plt.xlabel("time steps")
+                # plt.imshow(phi, cmap="viridis", aspect="auto")
+                # plt.colorbar()
+                # plt.xlabel("time steps")
                 # plt.yticks(
                 #     np.arange(phi.shape[1]),
                 #     list("Hello world!  "),
                 #     rotation="horizontal",
                 # )
-                plt.margins(0.2)
-                plt.subplots_adjust(bottom=0.15)
-                plt.savefig(save_path + "/" + model_type + "/" + "heat_map" + str(best_epoch) + ".png")
-                plt.close()
+                # plt.margins(0.2)
+                # plt.subplots_adjust(bottom=0.15)
+                # plt.savefig(save_path + "/" + model_type + "/" + "heat_map" + str(best_epoch) + ".png")
+                # plt.close()
             # denormalize the generated offsets using train set mean and std
             gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
 
@@ -368,9 +373,10 @@ if __name__ == "__main__":
         )
     elif model_type == "synthesis":
         model = HandWritingSynthesisNet(
+            hidden_size=args.hidden_size,
             n_layers=3,
             output_size=121,
-            window_size=train_dataset.vocab_size,
+            vocab_size=train_dataset.vocab_size,
         )
     train(
         model,
