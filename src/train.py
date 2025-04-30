@@ -287,18 +287,18 @@ def train(
                 save_name=save_path + "/" + model_type + "/" + model_type + "_seq_" + str(best_epoch) + ".png",
             )
 
-            if model_type == "prediction":
-                # run the model once to get the full y_hat tensor
-                seq_tensor = torch.from_numpy(gen_seq).float().to(device)
-                with torch.no_grad():
-                    init_h = model.init_hidden(1, device)
-                    y_hat_full, _ = model.forward(seq_tensor, init_h)
+            # if model_type == "prediction":
+            #     # run the model once to get the full y_hat tensor
+            #     seq_tensor = torch.from_numpy(gen_seq).float().to(device)
+            #     with torch.no_grad():
+            #         init_h = model.init_hidden(1, device)
+            #         y_hat_full, _ = model.forward(seq_tensor, init_h)
 
-                visualize_mdn_overlay(
-                    gen_seq[0],
-                    y_hat_full,
-                    save_path + "/" + model_type + "/" + "mdn_overlay_" + str(best_epoch) + ".png",
-                )
+            #     visualize_mdn_overlay(
+            #         gen_seq[0],
+            #         y_hat_full,
+            #         save_path + "/" + model_type + "/" + "mdn_overlay_" + str(best_epoch) + ".png",
+            #     )
 
             k = 0
         elif k > patience:

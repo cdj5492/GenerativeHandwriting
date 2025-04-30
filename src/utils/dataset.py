@@ -489,7 +489,7 @@ class MathHandwritingDataset(Dataset):
         # # This might be needed if unk_token_id was -1
         # tokens = [tok for tok in tokens if tok != -1]
 
-        return tokens # Return list of integer token IDs
+        return np.array(tokens).astype(np.float32) # Return numpy array of token IDs
 
     def idx_to_char(self, token_ids):
         """
@@ -518,7 +518,7 @@ class MathHandwritingDataset(Dataset):
              else:
                  # Handle unknown tokens
                  tokens.append('<UNK>') # Represent unknown IDs using the UNK string
-        return tokens # Return list of token strings
+        return np.array(tokens) # Return list of token strings
 
     def __len__(self):
         return self.dataset.shape[0]

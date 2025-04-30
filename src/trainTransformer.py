@@ -41,10 +41,10 @@ def argparser():
     p.add_argument("--n_epochs",    type=int,   default=100)
     p.add_argument("--lr",          type=float, default=3e-4)
     p.add_argument("--warmup",      type=int,   default=4000,
-                   help="warm-up steps for Transformer schedule")
+                       help="warm-up steps for Transformer schedule")
     p.add_argument("--patience",    type=int,   default=1500)
     p.add_argument("--model_type",  type=str,   default="prediction",
-                   choices=["prediction", "synthesis"])
+                       choices=["prediction", "synthesis"])
     p.add_argument("--data_path",   type=str,   default="./data/")
     p.add_argument("--save_path",   type=str,   default="./logs/")
     p.add_argument("--text_req",    action="store_true")
@@ -140,25 +140,47 @@ def train(model, train_loader, valid_loader, args, device):
     )
     scaler = torch.amp.GradScaler(enabled=device.type == "cuda")
 
-    save_path = os.path.join(args.save_path,
-                             f"best_{args.model_type}.pt")
+    # --- MODIFIED: Construct save path for model file with 't_' prefix ---
+    model_save_path = os.path.join(args.save_path,
+                                   f"t_best_{args.model_type}.pt")
+    # --- END MODIFICATION ---
+
     os.makedirs(args.save_path, exist_ok=True)
+
+    # --- ADDED: Create specific subdirectories for plots ---
+    pred_plot_dir = os.path.join(args.save_path, 't_prediction')
+    synth_plot_dir = os.path.join(args.save_path, 't_synthesis')
+    os.makedirs(pred_plot_dir, exist_ok=True)
+    os.makedirs(synth_plot_dir, exist_ok=True)
+    # --- END ADDITION ---
+
     best_loss, best_epoch = float("inf"), 0
 
-    # if the modelfile doesn't exist, create it
-    if not os.path.exists(save_path):
-        torch.save(model.state_dict(), save_path)
+    # if the modelfile doesn't exist, create it (using the new path)
+    if not os.path.exists(model_save_path):
+        torch.save(model.state_dict(), model_save_path)
+        print(f"Initial model state saved to {model_save_path}")
     else:
-        model.load_state_dict(torch.load(save_path))
+        print(f"Loading existing model state from {model_save_path}")
+        model.load_state_dict(torch.load(model_save_path))
 
     # generate one before training for visualization
+    # --- MODIFIED: Use new plot directories and simplified filenames ---
+    print("Generating initial sample plot...")
     if args.model_type == "prediction":
         gen_seq = generate_unconditional_seq(
-            model_path=save_path, seq_len=700, device=device, bias=10.0, style=None, prime=False
+            model_path=model_save_path, seq_len=700, device=device, bias=10.0, style=None, prime=False
         )
-    else:
+        gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
+        initial_plot_path = os.path.join(pred_plot_dir, "initial_prediction.png")
+        plot_stroke(
+            gen_seq[0],
+            save_name=initial_plot_path,
+        )
+        print(f"Saved initial prediction plot to {initial_plot_path}")
+    else: # Synthesis
         gen_seq, phi = generate_conditional_sequence(
-            model_path=save_path,
+            model_path=model_save_path,
             char_seq="3(3b+4)-6=-12",
             device=device,
             dataset=train_loader.dataset,
@@ -168,16 +190,16 @@ def train(model, train_loader, valid_loader, args, device):
             real_text=None,
             is_map=True,
         )
+        gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
+        initial_plot_path = os.path.join(synth_plot_dir, "initial_synthesis.png")
+        plot_stroke(
+            gen_seq[0],
+            save_name=initial_plot_path,
+        )
+        print(f"Saved initial synthesis plot to {initial_plot_path}")
+    # --- END MODIFICATION ---
 
-    # denormalize the generated offsets using train set mean and std
-    gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
-
-    # plot the sequence
-    plot_stroke(
-        gen_seq[0],
-        save_name=save_path + args.model_type + "_seq_" + str(best_epoch) + ".png",
-    )
-
+    print("Starting training loop...")
     for epoch in range(1, args.n_epochs + 1):
         tr_loss = run_epoch(model, train_loader, scaler,
                             optimiser, device, True, args.model_type)
@@ -189,8 +211,9 @@ def train(model, train_loader, valid_loader, args, device):
               f"lr={scheduler.get_last_lr()[0]:.2e}")
 
         # periodic plotting for debug
+        # --- MODIFIED: Use new plot directories ---
         if args.model_type == "prediction":
-            state_path = save_path if os.path.exists(save_path) else None
+            state_path = model_save_path if os.path.exists(model_save_path) else None
             gen_seq = generate_unconditional_seq(
                 model_path = state_path,
                 seq_len=700, device=device, bias=10.0,
@@ -199,10 +222,10 @@ def train(model, train_loader, valid_loader, args, device):
             gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
             plot_stroke(
                 gen_seq[0],
-                save_name=os.path.join(args.save_path, 'pred_epoch%d.png' % epoch)
+                save_name=os.path.join(pred_plot_dir, 'pred_epoch%d.png' % epoch) # Save to t_prediction subdir
             )
-        else:
-            state_path = save_path if os.path.exists(save_path) else None
+        else: # Synthesis
+            state_path = model_save_path if os.path.exists(model_save_path) else None
             gen_seq, phi = generate_conditional_sequence(
                 model_path=state_path,
                 char_seq='3(3b+4)-6=-12',
@@ -210,21 +233,27 @@ def train(model, train_loader, valid_loader, args, device):
                 bias=10.0, prime=False,
                 prime_seq=None, real_text=None, is_map=True
             )
+            # Optional: Save phi plot (attention map)
+            # phi_plot_path = os.path.join(synth_plot_dir, 'phi_epoch%d.png' % epoch)
             # plt.figure()
             # plt.imshow(phi, cmap='viridis', aspect='auto')
             # plt.colorbar()
-            # plt.savefig(os.path.join(args.save_path, 'phi_epoch%d.png' % epoch))
+            # plt.savefig(phi_plot_path)
             # plt.close()
+
             gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
             plot_stroke(
                 gen_seq[0],
-                save_name=os.path.join(args.save_path, 'synth_epoch%d.png' % epoch)
+                save_name=os.path.join(synth_plot_dir, 'synth_epoch%d.png' % epoch) # Save to t_synthesis subdir
             )
+        # --- END MODIFICATION ---
 
         if val_loss < best_loss:
-            torch.save(model.state_dict(), save_path)
+            # --- MODIFIED: Save using the new model path ---
+            torch.save(model.state_dict(), model_save_path)
+            # --- END MODIFICATION ---
             best_loss, best_epoch = val_loss, epoch
-            print(f"  > saved new best model (epoch {epoch})")
+            print(f"  > saved new best model (epoch {epoch}) to {model_save_path}")
 
     print(f"Training done. Best epoch = {best_epoch} (valid={best_loss:.4f})")
 
@@ -242,28 +271,33 @@ if __name__ == "__main__":
     print(f"Running on {device}")
 
     # ------------------------ DATA ---------------------------------- #
-    train_ds = MathHandwritingDataset(
+    print("Loading datasets...")
+    # train_ds = MathHandwritingDataset(
+    train_ds = HandwritingDataset(
         args.data_path, split="train",
         text_req=args.text_req, debug=args.debug, data_aug=args.data_aug
     )
-    valid_ds = MathHandwritingDataset(
+    # valid_ds = MathHandwritingDataset(
+    valid_ds = HandwritingDataset(
         args.data_path, split="valid",
         text_req=args.text_req, debug=args.debug, data_aug=args.data_aug
     )
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size,
-                              shuffle=True,  pin_memory=True, drop_last=True)
+                              shuffle=True,  pin_memory=True, drop_last=True, num_workers=4) # Added num_workers
     valid_loader = DataLoader(valid_ds, batch_size=args.batch_size,
-                              shuffle=False, pin_memory=True, drop_last=True)
+                              shuffle=False, pin_memory=True, drop_last=True, num_workers=4) # Added num_workers
+    print("Datasets loaded.")
 
     # ------------------------ MODEL --------------------------------- #
+    print(f"Building {args.model_type} model...")
     if args.model_type == "prediction":
         model = HandWritingPredictionNet(
             d_model=args.d_model,
             nhead=args.nhead,
             num_layers=args.nlayers,
         )
-    else:
+    else: # Synthesis
         model = HandWritingSynthesisNet(
             vocab_size=train_ds.vocab_size,
             d_model=args.d_model,
@@ -271,6 +305,10 @@ if __name__ == "__main__":
             num_encoder_layers=args.nlayers,
             num_decoder_layers=args.nlayers,
         )
+    print("Model built.")
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Model has {num_params/1e6:.2f}M trainable parameters.")
+
 
     # ------------------ TRAIN --------------------------------------- #
     train(model, train_loader, valid_loader, args, device)
