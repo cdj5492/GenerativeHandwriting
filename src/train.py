@@ -33,7 +33,7 @@ def argparser():
     parser.add_argument("--hidden_size", type=int, default=400)
     parser.add_argument("--n_layers", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--step_size", type=int, default=100)
+    parser.add_argument("--step_size", type=int, default=1000)
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--patience", type=int, default=50)
