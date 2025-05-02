@@ -169,6 +169,7 @@ class HandwritingDataset(Dataset):
 # }
 TOKEN_TO_ID = {
     '\\frac{'  : 0,
+    '{_frac_den': 120,
     '\\sqrt{'  : 1,
     '\\times'  : 2,
     '\\neq'    : 3,
@@ -186,6 +187,7 @@ TOKEN_TO_ID = {
     '-'        : 15,
     '>'        : 16,
     '<'        : 17,
+    '.'        : 100,
     '0'        : 18,
     '1'        : 19,
     '2'        : 20,
@@ -414,82 +416,98 @@ class MathHandwritingDataset(Dataset):
     def char_to_idx(self, latex_expr):
         """
         Tokenizes a LaTeX expression string into a list of token IDs.
-        Note: Despite the name, this method processes multi-character tokens.
+        Handles multi-character tokens and contextual braces.
+        Includes special logic for \frac{numerator}{denominator} structure.
+        Also decomposes function-style symbols like \sin, \log into individual letters.
         """
-        tokens = []    # This will hold the final list of token IDs
-        i = 0          # Current index in the input LaTeX string
-        stack = []     # Stack to keep track of open tokens requiring contextual closing
+        expr = latex_expr.replace(' ', '')
 
-        while i < len(latex_expr):
-            # Skip spaces explicitly if needed (they have ID 39 but often ignored)
-            if latex_expr[i] == ' ':
-                 i += 1
-                 continue # Or append token_to_id[' '] if spaces are significant
+        tokens = []
+        i = 0
+        stack = []
+        awaiting_frac_den = False
 
+        # Symbols like \sin, \log, etc. should be broken into letters
+        letter_commands = ['\\sin', '\\cos', '\\tan', '\\ln', '\\log']
+
+        while i < len(expr):
             match_found = False
 
-            # Try to match the longest possible token from our sorted list
-            for tok in self.sorted_tokens:
-                # Check bounds before slicing
-                if i + len(tok) <= len(latex_expr) and latex_expr[i:i+len(tok)] == tok:
-                    token_id = self.token_to_id[tok]
-                    tokens.append(token_id)
-                    # If this token needs a contextual closing brace, push it onto the stack
-                    if tok in self.contextual_closing_braces:
-                         # Special case for \frac{ num { den } -> push '{' for denominator brace context
-                         if tok == '\\frac{':
-                              stack.append('{') # Expect denominator brace next
-                         stack.append(tok) # Push the token itself for context
-                    i += len(tok)
+            # Handle decomposable letter commands first
+            for cmd in letter_commands:
+                if expr[i:i+len(cmd)] == cmd:
                     match_found = True
-                    break # Stop searching once the longest match is found
+                    for ch in cmd[1:]:  # skip only the backslash
+                        if ch in self.token_to_id:
+                            tokens.append(self.token_to_id[ch])
+                        else:
+                            tokens.append(self.unk_token_id)
+                    i += len(cmd)
+                    break
 
             if match_found:
-                continue # Proceed to the next character/token
+                continue
 
-            # Handle closing brace '}'
-            if latex_expr[i] == '}':
-                if stack:
-                    opening = stack.pop() # Pop the last opening context
-                    # Check if the popped item requires a specific closing brace ID
-                    if opening in self.contextual_closing_braces:
-                        tokens.append(self.contextual_closing_braces[opening])
-                    else:
-                        # This case might indicate mismatched braces or a simple '{' being closed.
-                        # If a simple '{' has its own ID and doesn't require context,
-                        # closing it should ideally not involve the context stack.
-                        # Let's append UNK for unexpected '}' based on stack context.
-                        tokens.append(self.unk_token_id)
+            # Try to match multi-character tokens
+            for tok in self.sorted_tokens:
+                if i + len(tok) <= len(expr) and expr[i:i+len(tok)] == tok:
+                    token_id = self.token_to_id[tok]
+                    tokens.append(token_id)
 
-                else:
-                    # Unmatched closing brace '}' found
-                    tokens.append(self.unk_token_id)
+                    if tok == '\\frac{':
+                        stack.append('frac_num')
+                        awaiting_frac_den = True
+                    elif tok in self.contextual_closing_braces:
+                        stack.append(tok)
+
+                    i += len(tok)
+                    match_found = True
+                    break
+
+            if match_found:
+                continue
+
+            # Handle opening brace
+            if expr[i] == '{':
+                if awaiting_frac_den:
+                    if '{_frac_den' in self.token_to_id:
+                        tokens.append(self.token_to_id['{_frac_den'])
+                    stack.append('frac_den')
+                    awaiting_frac_den = False
                 i += 1
                 continue
 
-            # If no multi-character token matched, check single characters in the main dict
-            char = latex_expr[i]
+            # Handle closing brace
+            if expr[i] == '}':
+                if stack:
+                    opening = stack.pop()
+                    if opening == 'frac_num':
+                        tokens.append(self.contextual_closing_braces['\\frac{'])
+                    elif opening == 'frac_den':
+                        tokens.append(self.contextual_closing_braces['{'])
+                    elif opening in self.contextual_closing_braces:
+                        tokens.append(self.contextual_closing_braces[opening])
+                i += 1
+                continue
+
+            # Handle single-character tokens
+            char = expr[i]
             if char in self.token_to_id:
-                 token_id = self.token_to_id[char]
-                 tokens.append(token_id)
-                 # Check if this single char is an opening brace that needs contextual closing
-                 if char in self.contextual_closing_braces:
-                      stack.append(char)
+                tokens.append(self.token_to_id[char])
+                if char in self.contextual_closing_braces:
+                    stack.append(char)
             else:
-                # Unknown character not in vocabulary
                 tokens.append(self.unk_token_id)
-            i += 1 # Move to next character
+            i += 1
 
-        # Check for unclosed items on stack at the end (malformed expression)
         if stack:
-             # Append UNK for each unclosed item
-             tokens.extend([self.unk_token_id] * len(stack))
+            tokens.extend([self.unk_token_id] * len(stack))
 
-        # # Filter out any -1 tokens if they represent errors and shouldn't be in the sequence
-        # # This might be needed if unk_token_id was -1
-        # tokens = [tok for tok in tokens if tok != -1]
+        token_array = np.array(tokens).astype(np.float32)
+        # print(f"The token for {latex_expr} is {token_array}")
+        return token_array
 
-        return np.array(tokens).astype(np.float32) # Return numpy array of token IDs
+
 
     def idx_to_char(self, token_ids):
         """
