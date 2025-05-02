@@ -33,7 +33,7 @@ def argparser():
     parser.add_argument("--hidden_size", type=int, default=400)
     parser.add_argument("--n_layers", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--step_size", type=int, default=1000)
+    parser.add_argument("--step_size", type=int, default=500)
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--patience", type=int, default=50)
@@ -44,6 +44,7 @@ def argparser():
     parser.add_argument("--data_aug", action="store_true")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--seed", type=int, default=212, help="random seed")
+    parser.add_argument("--char_seq", type=str, default="3(3b+4)-6=-12")
     args = parser.parse_args()
 
     return args
@@ -169,6 +170,7 @@ def train(
     device,
     model_type,
     save_path,
+    char_seq=None,
 ):
     model_path = save_path + "best_model_" + model_type + ".pt"
     model = model.to(device)
@@ -202,7 +204,7 @@ def train(
     else:
         gen_seq, phi = generate_conditional_sequence(
             model_path=model_path,
-            char_seq="3(3b+4)-6=-12",
+            char_seq=char_seq,
             device=device,
             dataset=train_loader.dataset,
             bias=10.0,
@@ -264,29 +266,35 @@ def train(
             else:
                 gen_seq, phi = generate_conditional_sequence(
                     model_path=model_path,
-                    char_seq="3(3b+4)-6=-12",
+                    char_seq=char_seq,
                     device=device,
                     dataset=train_loader.dataset,
                     bias=10.0,
                     prime=False,
                     prime_seq=None,
                     real_text=None,
-                    is_map=False,
+                    is_map=True,
                     model_arch='lstm',
                 )
 
-                # plt.imshow(phi, cmap="viridis", aspect="auto")
-                # plt.colorbar()
-                # plt.xlabel("time steps")
-                # plt.yticks(
-                #     np.arange(phi.shape[1]),
-                #     list("Hello world!  "),
-                #     rotation="horizontal",
-                # )
-                # plt.margins(0.2)
-                # plt.subplots_adjust(bottom=0.15)
-                # plt.savefig(save_path + "/" + model_type + "/" + "heat_map" + str(best_epoch) + ".png")
-                # plt.close()
+                # tokenize char_seq
+                char_seq = list(char_seq)
+                token_seq = train_dataset.char_to_idx(char_seq)
+                # convert back
+                token_char_seq = train_dataset.idx_to_char(token_seq)
+
+                plt.imshow(phi, cmap="viridis", aspect="auto")
+                plt.colorbar()
+                plt.xlabel("time steps")
+                plt.yticks(
+                    np.arange(phi.shape[0]),
+                    token_char_seq,
+                    rotation="horizontal",
+                )
+                plt.margins(0.2)
+                plt.subplots_adjust(bottom=0.15)
+                plt.savefig(save_path + "/" + model_type + "/" + "heat_map" + str(best_epoch) + ".png")
+                plt.close()
             # denormalize the generated offsets using train set mean and std
             gen_seq = data_denormalization(Global.train_mean, Global.train_std, gen_seq)
 
@@ -337,16 +345,16 @@ if __name__ == "__main__":
     n_epochs = args.n_epochs
 
     # Load the data and text
-    train_dataset = MathHandwritingDataset(
-    # train_dataset = HandwritingDataset(
+    # train_dataset = MathHandwritingDataset(
+    train_dataset = HandwritingDataset(
         args.data_path,
         split="train",
         text_req=args.text_req,
         debug=args.debug,
         data_aug=args.data_aug,
     )
-    valid_dataset = MathHandwritingDataset(
-    # valid_dataset = HandwritingDataset(
+    # valid_dataset = MathHandwritingDataset(
+    valid_dataset = HandwritingDataset(
         args.data_path,
         split="valid",
         text_req=args.text_req,
@@ -394,4 +402,5 @@ if __name__ == "__main__":
         device,
         model_type,
         args.save_path,
+        args.char_seq,
     )

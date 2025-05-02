@@ -503,7 +503,7 @@ class MathHandwritingDataset(Dataset):
         if stack:
             tokens.extend([self.unk_token_id] * len(stack))
 
-        token_array = np.array(tokens).astype(np.float32)
+        token_array = np.array(tokens).astype(np.int64)
         # print(f"The token for {latex_expr} is {token_array}")
         return token_array
 

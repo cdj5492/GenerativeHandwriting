@@ -250,31 +250,34 @@ def generate_conditional_sequence(
     print(f"Decoded input text: '{decoded_input_text}'")
 
 
-    # --- Extract Attention Weights (if applicable) ---
+    # --- Extract Attention Weights (if applicable) --------------------
     phi = []
-    if hasattr(model, '_phi') and model._phi is not None: # Check if model stored phi
-        # Check if _phi is a list and not empty
-        if isinstance(model._phi, list) and model._phi:
-            try:
-                phi_tensor = torch.cat(model._phi, dim=1) # Concatenate along sequence dim
-                 # Check dimensions before transpose, handle potential batch > 1
-                if phi_tensor.dim() >= 3 and phi_tensor.shape[0] > 0: # Batch, Seq, Features
-                     phi = phi_tensor[0].cpu().numpy().T # Take first batch item, transpose
-                elif phi_tensor.dim() == 2: # If already concatenated differently (Seq, Feat)
-                     phi = phi_tensor.cpu().numpy().T
-                else:
-                     print("Warning: Unexpected shape for concatenated phi tensor.")
-                     phi = phi_tensor.cpu().numpy() # Return as is
+    raw_phi = getattr(model, "_phi", None)
 
-            except Exception as e:
-                print(f"Warning: Could not process attention weights (phi): {e}")
-                # Optionally try returning the raw list if concatenation fails
-                # phi = [p[0].cpu().numpy().T for p in model._phi if p.shape[0]>0]
-        else:
-            print("Warning: Model attribute '_phi' found but is not a non-empty list.")
+    if raw_phi is not None:
+        try:
+            # Bring everything to a single tensor on CPU
+            if isinstance(raw_phi, list):                 # legacy checkpoints
+                phi_tensor = torch.cat(raw_phi, dim=1)    # [B, seq, text]
+            else:                                         # current model: already a tensor
+                phi_tensor = raw_phi
+
+            phi_tensor = phi_tensor.detach()              # just in case
+            # Standardise expected dimensionality
+            if phi_tensor.dim() == 3 and phi_tensor.size(0) > 0:
+                # [batch, seq_len, text_len] take first batch, transpose
+                phi = phi_tensor[0].transpose(0, 1).cpu().numpy()  # (text_len, seq_len)
+            elif phi_tensor.dim() == 2:
+                # Rare: already collapsed to [seq_len, text_len]
+                phi = phi_tensor.transpose(0, 1).cpu().numpy()
+            else:
+                print("Warning: unexpected _phi shape:", tuple(phi_tensor.shape))
+                phi = phi_tensor.cpu().numpy()            # fallback (shape may differ)
+
+        except Exception as e:
+            print(f"Warning: failed to process attention weights (_phi): {e}")
     elif is_map:
-         print("Warning: is_map is True, but attention weights (phi) not found in model._phi")
-
+        print("Warning: is_map is True, but attention weights (_phi) not found.")
 
     return gen_seq, phi
 
