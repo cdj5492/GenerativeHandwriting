@@ -148,466 +148,319 @@ class HandwritingDataset(Dataset):
             target = torch.from_numpy(self.dataset[idx])
             return (input_seq, target, mask)
 
-# --- Define Tokenizer Mappings ---
-# Using class attributes for better organization within the Dataset
-# TOKEN_TO_ID = {
-#     '\\infty': 1, '\\ldots': 2, '\\times': 3, '\\theta': 4, '\\alpha': 5,
-#     '\\gamma': 6, '\\lambda': 7, '\\sigma': 8, '\\cdot': 9, '\\frac{': 10,
-#     '\\sqrt{': 11, '\\log_': 12, '\\neq': 13, '\\beta': 14, '\\phi': 15,
-#     '\\div': 16, '\\geq': 17, '\\leq': 18, '\\sin': 19, '\\cos': 20,
-#     '\\tan': 21, '\\mu': 22, '\\pi': 23, '\\pm': 24, '^{': 25,
-#     '_{': 26, '(': 27, ')': 28, '{': 29, # Removed '}' : 30
-#     '^': 31, '_': 32, '=': 33, '+': 34, '-': 35, '!': 36, '>': 37, '<': 38,
-#     ' ': 39,  # Note: The tokenizer function skips spaces by default now
-#     '0': 40, '1': 41, '2': 42, '3': 43, '4': 44, '5': 45, '6': 46, '7': 47,
-#     '8': 48, '9': 49, 'A': 50, 'B': 51, 'C': 52, 'D': 53, 'E': 54, 'F': 55,
-#     'G': 56, 'H': 57, 'L': 58, 'M': 59, 'N': 60, 'P': 61, 'R': 62, 'S': 63,
-#     'T': 64, 'V': 65, 'X': 66, 'Y': 67, 'a': 68, 'b': 69, 'c': 70, 'd': 71,
-#     'e': 72, 'f': 73, 'g': 74, 'h': 75, 'i': 76, 'j': 77, 'k': 78, 'l': 79,
-#     'm': 80, 'n': 81, 'o': 82, 'p': 83, 'q': 84, 'r': 85, 's': 86, 't': 87,
-#     'u': 88, 'v': 89, 'w': 90, 'x': 91, 'y': 92, 'z': 93,
-# }
-TOKEN_TO_ID = {
-    '\\frac{'  : 0,
-    '{_frac_den': 120,
-    '\\sqrt{'  : 1,
-    '\\times'  : 2,
-    '\\neq'    : 3,
-    '\\geq'    : 4,
-    '\\leq'    : 5,
-    '\\pi'     : 6,
-    '^{'       : 7,
-    '_{'       : 8,
-    '('        : 9,
-    ')'        : 10,
-    '^'        : 11,
-    '_'        : 12,
-    '='        : 13,
-    '+'        : 14,
-    '-'        : 15,
-    '>'        : 16,
-    '<'        : 17,
-    '.'        : 100,
-    '0'        : 18,
-    '1'        : 19,
-    '2'        : 20,
-    '3'        : 21,
-    '4'        : 22,
-    '5'        : 23,
-    '6'        : 24,
-    '7'        : 25,
-    '8'        : 26,
-    '9'        : 27,
-    'A'        : 28,
-    'B'        : 29,
-    'C'        : 30,
-    'D'        : 31,
-    'E'        : 32,
-    'F'        : 33,
-    'G'        : 34,
-    'H'        : 35,
-    'I'        : 36,
-    'J'        : 37,
-    'K'        : 38,
-    'L'        : 39,
-    'M'        : 40,
-    'N'        : 41,
-    'O'        : 42,
-    'P'        : 43,
-    'Q'        : 44,
-    'R'        : 45,
-    'S'        : 46,
-    'T'        : 47,
-    'U'        : 48,
-    'V'        : 49,
-    'W'        : 50,
-    'X'        : 51,
-    'Y'        : 52,
-    'Z'        : 53,
-    'a'        : 54,
-    'b'        : 55,
-    'c'        : 56,
-    'd'        : 57,
-    'e'        : 58,
-    'f'        : 59,
-    'g'        : 60,
-    'h'        : 61,
-    'i'        : 62,
-    'j'        : 63,
-    'k'        : 64,
-    'l'        : 65,
-    'm'        : 66,
-    'n'        : 67,
-    'o'        : 68,
-    'p'        : 69,
-    'q'        : 70,
-    'r'        : 71,
-    's'        : 72,
-    't'        : 73,
-    'u'        : 74,
-    'v'        : 75,
-    'w'        : 76,
-    'x'        : 77,
-    'y'        : 78,
-    'z'        : 79,
-    '<PAD>'    : 80,
-    '<SOS>'    : 81,
-    '<EOS>'    : 82,
-    '<UNK>'    : 83
-}
+# --- Token Definitions ---
+PAD_TOK = "<pad>"
+START_SQRT_TOK = "\\sqrt{"
+END_SQRT_TOK = "}"
+PI_TOK = "\\pi"
+START_FRAC_TOK = "\\frac{"
+MID_FRAC_TOK = "}{"
+END_FRAC_TOK = "}"
 
-CONTEXTUAL_CLOSING_BRACES = {
-    '\\frac{': 84,  # ID for closing brace of fraction numerator
-    '{': 85,        # ID for closing brace of fraction denominator
-    '\\sqrt{': 86,  # ID for closing brace of square root
-    '_{': 87,       # ID for closing brace of subscript
-    '^{': 88        # ID for closing brace of exponent
-}
+SPECIAL_TOKENS = [PAD_TOK, START_SQRT_TOK, END_SQRT_TOK, PI_TOK, START_FRAC_TOK, MID_FRAC_TOK]
 
+# --- Helper Functions for LaTeX Tokenization ---
 
-# Create reverse mappings
-ID_TO_TOKEN = {v: k for k, v in TOKEN_TO_ID.items()}
-ID_TO_CONTEXT = {v: k for k, v in CONTEXTUAL_CLOSING_BRACES.items()}
+def _find_matching_brace(text, start_index):
+    open_brace_pos = -1
+    search_idx = start_index
+    while search_idx < len(text):
+        if text[search_idx] == '{':
+            open_brace_pos = search_idx
+            break
+        search_idx += 1
+    if open_brace_pos == -1: return -1
+    brace_level = 1
+    i = open_brace_pos + 1
+    while i < len(text):
+        if text[i] == '{': brace_level += 1
+        elif text[i] == '}':
+            brace_level -= 1
+            if brace_level == 0: return i
+        i += 1
+    return -1
 
-# Combine all IDs to find the range for vocab size
-ALL_IDS = list(TOKEN_TO_ID.values()) + list(CONTEXTUAL_CLOSING_BRACES.values())
-# Ensure PAD, SOS, EOS, UNK are included if defined
-ALL_IDS.extend([TOKEN_TO_ID.get('<PAD>', 0), TOKEN_TO_ID.get('<SOS>', -1), TOKEN_TO_ID.get('<EOS>', -1), TOKEN_TO_ID.get('<UNK>', -1)])
-ALL_IDS = [i for i in ALL_IDS if i >= 0] # Filter out potential -1 placeholders if not defined
-VOCAB_SIZE = max(ALL_IDS) + 1 if ALL_IDS else 0 # +1 because IDs are typically 0-indexed or 1-indexed
-
-# Sort tokens for efficient matching in tokenizer
-# Exclude special tokens like <PAD> from sorting if they shouldn't be matched literally
-SORTED_TOKENS = sorted([k for k in TOKEN_TO_ID.keys() if not k.startswith('<') and not k.endswith('>') ], key=len, reverse=True)
+def _tokenize_latex(text):
+    # Expects a single string, already space-removed if desired
+    # text = text.replace(" ", "") # Space removal now happens before calling this
+    tokens = []
+    i = 0
+    while i < len(text):
+        if text.startswith("\\sqrt{", i):
+            cmd_len = len("\\sqrt{")
+            match_brace_idx = _find_matching_brace(text, i + cmd_len - 1)
+            if match_brace_idx != -1:
+                tokens.append(START_SQRT_TOK)
+                content_start = i + cmd_len
+                content = text[content_start : match_brace_idx]
+                tokens.extend(_tokenize_latex(content)) # Recursive call on content
+                tokens.append(END_SQRT_TOK)
+                i = match_brace_idx + 1
+            else:
+                tokens.append(text[i]); i += 1 # Malformed, treat as chars
+        elif text.startswith("\\frac{", i):
+            cmd_len = len("\\frac{")
+            num_start_brace_pos = i + cmd_len - 1
+            num_end_brace_pos = _find_matching_brace(text, num_start_brace_pos)
+            if num_end_brace_pos != -1 and (num_end_brace_pos + 1) < len(text) and text[num_end_brace_pos + 1] == '{':
+                den_start_brace_pos = num_end_brace_pos + 1
+                den_end_brace_pos = _find_matching_brace(text, den_start_brace_pos)
+                if den_end_brace_pos != -1:
+                    tokens.append(START_FRAC_TOK)
+                    num_content = text[num_start_brace_pos + 1 : num_end_brace_pos]
+                    tokens.extend(_tokenize_latex(num_content))
+                    tokens.append(MID_FRAC_TOK)
+                    den_content = text[den_start_brace_pos + 1 : den_end_brace_pos]
+                    tokens.extend(_tokenize_latex(den_content))
+                    tokens.append(END_FRAC_TOK)
+                    i = den_end_brace_pos + 1
+                else:
+                    tokens.append(text[i]); i += 1 # Malformed denominator
+            else:
+                tokens.append(text[i]); i += 1 # Malformed numerator
+        elif text.startswith("\\pi", i):
+            tokens.append(PI_TOK)
+            i += len("\\pi")
+        elif text[i] == '{':
+            match_brace_idx = _find_matching_brace(text, i)
+            if match_brace_idx != -1:
+                # Assumes non-command braces are for grouping; tokenizes content
+                content = text[i + 1 : match_brace_idx]
+                tokens.extend(_tokenize_latex(content))
+                i = match_brace_idx + 1
+            else:
+                tokens.append('{'); i += 1 # Unmatched brace
+        else:
+            # Append other characters (includes '}')
+            tokens.append(text[i]); i += 1
+    return tokens
 
 class MathHandwritingDataset(Dataset):
     """Handwriting dataset with LaTeX tokenization."""
 
-    # --- Store tokenizer info as class attributes ---
-    token_to_id = TOKEN_TO_ID
-    contextual_closing_braces = CONTEXTUAL_CLOSING_BRACES
-    id_to_token = ID_TO_TOKEN
-    id_to_context = ID_TO_CONTEXT
-    sorted_tokens = SORTED_TOKENS
-    vocab_size = VOCAB_SIZE
-    pad_token_id = TOKEN_TO_ID.get('<PAD>', 80)
-    unk_token_id = TOKEN_TO_ID.get('<UNK>', 83) # Default UNK id
-    # ---
-
     def __init__(self, data_path, split='train', text_req=False, debug=False, max_seq_len=300, data_aug=False):
-        """
-        Args:
-            data_path (string): Path to the data folder (expecting strokes.npy and sentences.txt).
-            split (string): 'train' or 'valid'.
-            text_req (bool): If True, __getitem__ returns tokenized text sequences.
-            debug (bool): If True, use a small subset of data.
-            max_seq_len (int): Maximum sequence length for stroke data during data augmentation.
-            data_aug (bool): If True, apply data augmentation (random cropping of strokes).
-        """
         self.text_req = text_req
         self.max_seq_len = max_seq_len
         self.data_aug = data_aug
 
-        # --- Load Stroke Data ---
-        strokes = np.load(data_path + 'strokes.npy', allow_pickle=True, encoding='bytes')
-        lengths = [len(stroke) for stroke in strokes]
-        max_len = np.max(lengths) if lengths else 0
-        n_total = len(strokes)
-
-        # Stroke Mask
-        mask_shape = (n_total, max_len)
-        mask = np.zeros(mask_shape, dtype=np.float32)
-
-        # Stroke Data Array
-        data_shape = (n_total, max_len, 3)
-        data = np.zeros(data_shape, dtype=np.float32)
-
-        for i, seq_len in enumerate(lengths):
-             if seq_len > 0: # Avoid index errors for empty strokes
-                mask[i, :seq_len] = 1.
-                data[i, :seq_len] = strokes[i]
-
-        # --- Load and Tokenize Text Data ---
+        # --- Load Raw Data ---
+        strokes_path = data_path + 'strokes.npy'
+        texts_path = data_path + 'sentences.txt'
         try:
-            with open(data_path + 'sentences.txt') as file:
+            strokes = np.load(strokes_path, allow_pickle=True, encoding='latin1')
+            with open(texts_path, 'r', encoding='utf-8') as file:
                 raw_texts = file.read().splitlines()
-        except FileNotFoundError:
-            print(f"Error: sentences.txt not found at {data_path}")
-            raw_texts = [""] * n_total # Create empty texts if file missing, allows stroke-only use
+            print(f"Loaded {len(strokes)} strokes and {len(raw_texts)} sentences.")
+            if len(strokes) != len(raw_texts):
+                 print(f"Warning: Stroke/sentence count mismatch ({len(strokes)}/{len(raw_texts)}). Trimming to shorter length.")
+                 min_len = min(len(strokes), len(raw_texts))
+                 strokes = strokes[:min_len]
+                 raw_texts = raw_texts[:min_len]
+        except FileNotFoundError as e:
+            print(f"Error loading data: {e}.")
+            raise e
 
-        if len(raw_texts) != n_total:
-            raise ValueError(f"Number of strokes ({n_total}) does not match number of sentences ({len(raw_texts)})")
+        # --- Prepare Raw Text for Tokenization (Remove Spaces) ---
+        # Create clean strings first
+        cleaned_texts = [text.replace(" ", "") for text in raw_texts]
+        # Also create list of character lists if needed for char_to_idx input later
+        # char_seqs = [list(ct) for ct in cleaned_texts] # If char_to_idx strictly needs char list
 
-        # Tokenize all texts using the char_to_idx method (which now handles tokens)
-        tokenized_texts = [self.char_to_idx(text) for text in raw_texts]
+        # --- Tokenize ONCE for Vocabulary Building ---
+        print("Tokenizing text for vocabulary...")
+        tokenized_for_vocab = [_tokenize_latex(text) for text in cleaned_texts]
+        print("Tokenization for vocabulary complete.")
 
-        # Calculate token sequence lengths and max length
-        token_lens = [len(tokens) for tokens in tokenized_texts]
-        max_token_len = np.max(token_lens) if token_lens else 0
+        # --- Build Vocabulary ---
+        # Pass the token lists generated above
+        self.idx_to_tok_map, self.tok_to_idx_map = self.build_vocab(tokenized_for_vocab)
+        self.vocab_size = len(self.idx_to_tok_map)
+        print(f"Vocabulary size: {self.vocab_size}")
 
-        # Token Mask
-        token_mask_shape = (n_total, max_token_len)
-        token_mask = np.zeros(token_mask_shape, dtype=np.float32)
 
-        # Token ID Array (use a suitable integer type, e.g., int32)
-        # Initialize with the padding token ID
-        token_ids = np.full((n_total, max_token_len), self.pad_token_id, dtype=np.int32)
+        # --- Convert to Final Index Sequences using char_to_idx ---
+        # The char_to_idx method will now handle tokenization internally.
+        # We pass the cleaned *string* representation (or char list if strictly needed)
+        # NOTE: This implies tokenizing *again* inside char_to_idx for each sentence.
+        print("Converting sequences to indices using char_to_idx...")
+        # Pass the list of characters derived from the cleaned text
+        tok_indices = [self.char_to_idx(list(text)) for text in cleaned_texts]
+        print("Index conversion complete.")
 
-        # Populate token arrays
-        for i, (tokens, t_len) in enumerate(zip(tokenized_texts, token_lens)):
-            if t_len > 0: # Handle potentially empty token sequences
-                token_mask[i, :t_len] = 1.
-                token_ids[i, :t_len] = tokens
+
+        # --- Pad Index Sequences ---
+        pad_idx = self.tok_to_idx_map.get(PAD_TOK, 0)
+        if PAD_TOK not in self.tok_to_idx_map: print("Warning: PAD_TOK not in vocabulary!")
+
+        tok_lens = [len(seq) for seq in tok_indices] # Lengths are based on the *output* of char_to_idx
+        max_tok_len = np.max(tok_lens) if tok_lens else 0
+        print(f"Maximum token sequence length (after tokenization): {max_tok_len}")
+        n_total = len(strokes) # Use length after potential trimming
+
+        padded_tok_indices = np.full((n_total, max_tok_len), pad_idx, dtype=np.int64)
+        for i, seq in enumerate(tok_indices):
+            current_len = len(seq)
+            if current_len > max_tok_len:
+                 padded_tok_indices[i, :] = seq[:max_tok_len] # Truncate if somehow longer
+            else:
+                 padded_tok_indices[i, :current_len] = seq
+
+        tok_mask = np.zeros((n_total, max_tok_len), dtype=np.float32)
+        for i, length in enumerate(tok_lens):
+            actual_len = min(length, max_tok_len)
+            tok_mask[i, :actual_len] = 1.
+
+        # --- Prepare Stroke Data (Padding and Masking) ---
+        stroke_lens = [len(stroke) for stroke in strokes]
+        max_stroke_len = np.max(stroke_lens) if stroke_lens else 0
+        print(f"Maximum stroke sequence length: {max_stroke_len}")
+
+        stroke_mask = np.zeros((n_total, max_stroke_len), dtype=np.float32)
+        stroke_data = np.zeros((n_total, max_stroke_len, 3), dtype=np.float32)
+
+        for i, (stroke_len, stroke) in enumerate(zip(stroke_lens, strokes)):
+            actual_len = min(stroke_len, max_stroke_len)
+            if actual_len > 0:
+                 stroke_mask[i, :actual_len] = 1.
+                 stroke_np = np.array(stroke, dtype=np.float32) if not isinstance(stroke, np.ndarray) else stroke.astype(np.float32)
+                 stroke_data[i, :actual_len] = stroke_np[:actual_len]
 
         # --- Shuffle Data ---
         idx_permute = np.random.permutation(n_total)
-        data = data[idx_permute]
-        mask = mask[idx_permute]
-        token_ids = token_ids[idx_permute]
-        token_mask = token_mask[idx_permute]
-        # Keep raw texts if needed for debugging or inspection, shuffle them too
-        # raw_texts_shuffled = [raw_texts[i] for i in idx_permute]
+        stroke_data = stroke_data[idx_permute]
+        stroke_mask = stroke_mask[idx_permute]
+        self.token_sequences = padded_tok_indices[idx_permute] # Store final padded indices
+        self.token_mask = tok_mask[idx_permute]
 
         # --- Debug Subset ---
         if debug:
-            n_debug = min(64, n_total) # Ensure debug size isn't larger than total
-            data = data[:n_debug]
-            mask = mask[:n_debug]
-            token_ids = token_ids[:n_debug]
-            token_mask = token_mask[:n_debug]
-            # raw_texts_shuffled = raw_texts_shuffled[:n_debug]
+            n_debug = min(64, n_total)
+            stroke_data = stroke_data[:n_debug]
+            stroke_mask = stroke_mask[:n_debug]
+            self.token_sequences = self.token_sequences[:n_debug]
+            self.token_mask = self.token_mask[:n_debug]
+            print(f"Using debug subset of size {n_debug}")
 
-        # --- Train/Validation Split ---
-        n_samples = data.shape[0]
+        # --- Split Data ---
+        n_samples = stroke_data.shape[0]
         n_train = int(0.9 * n_samples)
+        if n_samples == 0:
+             print("Warning: No data samples after processing.")
+             # Init empty attributes
+             self.dataset = np.empty((0, max_stroke_len, 3), dtype=np.float32); self.mask = np.empty((0, max_stroke_len), dtype=np.float32)
+             self.texts = np.empty((0, max_tok_len), dtype=np.int64); self.char_mask = np.empty((0, max_tok_len), dtype=np.float32)
+             return
 
-        # Store stroke data temporarily for normalization calculation
-        self._data = data # Keep reference to full data for potential normalization calculation
+        print(f"Total samples: {n_samples}, Training samples: {n_train}, Validation samples: {n_samples - n_train}")
 
         if split == 'train':
-            self.dataset = data[:n_train]
-            self.mask = mask[:n_train]
-            self.token_ids = token_ids[:n_train]
-            self.token_mask = token_mask[:n_train]
-            # self.raw_texts = raw_texts_shuffled[:n_train] # Optional
-            # Apply normalization (assuming these functions/Global exist)
-            # if n_train > 0: # Avoid normalization on empty data
-            #    Global.train_mean, Global.train_std, self.dataset = train_offset_normalization(self.dataset)
-            print(f"Train split: {self.dataset.shape[0]} samples")
-
+            self.dataset = stroke_data[:n_train]; self.mask = stroke_mask[:n_train]
+            self.texts = self.token_sequences[:n_train]; self.char_mask = self.token_mask[:n_train]
+            if self.dataset.size > 0:
+                Global.train_mean, Global.train_std, self.dataset = train_offset_normalization(self.dataset)
+                print(f"Train data normalized. Mean: {Global.train_mean}, Std: {Global.train_std}")
+            else: print("Skipping training normalization (no data).")
         elif split == 'valid':
-            self.dataset = data[n_train:]
-            self.mask = mask[n_train:]
-            self.token_ids = token_ids[n_train:]
-            self.token_mask = token_mask[n_train:]
-            # self.raw_texts = raw_texts_shuffled[n_train:] # Optional
-            # Apply normalization using training stats (assuming these functions/Global exist)
-            # Need to ensure Global.train_mean/std are set (e.g., by instantiating train set first)
-            # if n_samples > n_train and Global.train_mean is not None: # Avoid normalization on empty data or if mean/std not calculated
-            #    self.dataset = valid_offset_normalization(Global.train_mean, Global.train_std, self.dataset)
-            print(f"Validation split: {self.dataset.shape[0]} samples")
-        else:
-             raise ValueError(f"Invalid split name: {split}. Choose 'train' or 'valid'.")
-
-        # Clean up temporary full dataset reference if no longer needed
-        # If normalization happens outside, you might need to keep self._data
-        # del self._data
-
-    def char_to_idx(self, latex_expr):
-        """
-        Tokenizes a LaTeX expression string into a list of token IDs.
-        Handles multi-character tokens and contextual braces.
-        Includes special logic for \frac{numerator}{denominator} structure.
-        Also decomposes function-style symbols like \sin, \log into individual letters.
-        """
-        expr = latex_expr.replace(' ', '')
-
-        tokens = []
-        i = 0
-        stack = []
-        awaiting_frac_den = False
-
-        # Symbols like \sin, \log, etc. should be broken into letters
-        letter_commands = ['\\sin', '\\cos', '\\tan', '\\ln', '\\log']
-
-        while i < len(expr):
-            match_found = False
-
-            # Handle decomposable letter commands first
-            for cmd in letter_commands:
-                if expr[i:i+len(cmd)] == cmd:
-                    match_found = True
-                    for ch in cmd[1:]:  # skip only the backslash
-                        if ch in self.token_to_id:
-                            tokens.append(self.token_to_id[ch])
-                        else:
-                            tokens.append(self.unk_token_id)
-                    i += len(cmd)
-                    break
-
-            if match_found:
-                continue
-
-            # Try to match multi-character tokens
-            for tok in self.sorted_tokens:
-                if i + len(tok) <= len(expr) and expr[i:i+len(tok)] == tok:
-                    token_id = self.token_to_id[tok]
-                    tokens.append(token_id)
-
-                    if tok == '\\frac{':
-                        stack.append('frac_num')
-                        awaiting_frac_den = True
-                    elif tok in self.contextual_closing_braces:
-                        stack.append(tok)
-
-                    i += len(tok)
-                    match_found = True
-                    break
-
-            if match_found:
-                continue
-
-            # Handle opening brace
-            if expr[i] == '{':
-                if awaiting_frac_den:
-                    if '{_frac_den' in self.token_to_id:
-                        tokens.append(self.token_to_id['{_frac_den'])
-                    stack.append('frac_den')
-                    awaiting_frac_den = False
-                i += 1
-                continue
-
-            # Handle closing brace
-            if expr[i] == '}':
-                if stack:
-                    opening = stack.pop()
-                    if opening == 'frac_num':
-                        tokens.append(self.contextual_closing_braces['\\frac{'])
-                    elif opening == 'frac_den':
-                        tokens.append(self.contextual_closing_braces['{'])
-                    elif opening in self.contextual_closing_braces:
-                        tokens.append(self.contextual_closing_braces[opening])
-                i += 1
-                continue
-
-            # Handle single-character tokens
-            char = expr[i]
-            if char in self.token_to_id:
-                tokens.append(self.token_to_id[char])
-                if char in self.contextual_closing_braces:
-                    stack.append(char)
+            if n_train >= n_samples:
+                 print("Warning: No validation samples after split."); n_val = 0
+                 self.dataset = np.empty((0, max_stroke_len, 3), dtype=np.float32); self.mask = np.empty((0, max_stroke_len), dtype=np.float32)
+                 self.texts = np.empty((0, max_tok_len), dtype=np.int64); self.char_mask = np.empty((0, max_tok_len), dtype=np.float32)
             else:
-                tokens.append(self.unk_token_id)
-            i += 1
-
-        if stack:
-            tokens.extend([self.unk_token_id] * len(stack))
-
-        token_array = np.array(tokens).astype(np.int64)
-        # print(f"The token for {latex_expr} is {token_array}")
-        return token_array
-
+                self.dataset = stroke_data[n_train:]; self.mask = stroke_mask[n_train:]
+                self.texts = self.token_sequences[n_train:]; self.char_mask = self.token_mask[n_train:]
+                if self.dataset.size > 0:
+                    self.dataset = valid_offset_normalization(Global.train_mean, Global.train_std, self.dataset)
+                    print("Validation data normalized using training stats.")
+                else: print("Skipping validation normalization (no data).")
+        else:
+             raise ValueError(f"Invalid split: {split}. Choose 'train' or 'valid'.")
 
 
-    def idx_to_char(self, token_ids):
-        """
-        Converts a sequence of token IDs back into a list of token strings.
-        Note: Despite the name, this method returns token strings, not single characters.
-        Args:
-            token_ids: An iterable (list, numpy array, tensor) of token IDs.
-        Returns:
-            A list of strings, where each string is a token.
-        """
-        tokens = []
-        for token_id in token_ids:
-             # Ensure token_id is an integer (e.g., if input is tensor)
-             if hasattr(token_id, 'item'): # Check if it's a tensor element
-                 token_id = token_id.item()
-             else:
-                 token_id = int(token_id)
-
-             if token_id == self.pad_token_id:
-                 continue # Skip padding tokens in the output list
-
-             if token_id in self.id_to_token:
-                 tokens.append(self.id_to_token[token_id])
-             elif token_id in self.id_to_context:
-                 tokens.append('}') # All contextual closing IDs map back to '}'
-             else:
-                 # Handle unknown tokens
-                 tokens.append('<UNK>') # Represent unknown IDs using the UNK string
-        return np.array(tokens) # Return list of token strings
+    def build_vocab(self, tokenized_texts_list):
+        """Builds vocabulary from a list of PRE-TOKENIZED sequences."""
+        counter = Counter()
+        for tokens in tokenized_texts_list:
+            counter.update(tokens)
+        # Build vocab based on these tokens
+        unique_tokens = [PAD_TOK]
+        unique_tokens.extend(sorted(list(set(tok for tok in SPECIAL_TOKENS if tok != PAD_TOK))))
+        data_tokens = sorted([tok for tok in counter if tok not in unique_tokens])
+        unique_tokens.extend(data_tokens)
+        final_unique_tokens = []; seen = set()
+        for tok in unique_tokens:
+            if tok not in seen: final_unique_tokens.append(tok); seen.add(tok)
+        idx_to_tok = {i: tok for i, tok in enumerate(final_unique_tokens)}
+        tok_to_idx = {tok: i for i, tok in idx_to_tok.items()}
+        for special in SPECIAL_TOKENS:
+             if special not in tok_to_idx: print(f"WARNING: Special token '{special}' missing!")
+        return idx_to_tok, tok_to_idx
 
     def __len__(self):
+        """Returns the number of samples in the dataset."""
         return self.dataset.shape[0]
 
+    def idx_to_char(self, id_seq):
+        """Converts a sequence of token indices back to token strings."""
+        # Name kept as idx_to_char, but operates on tokens
+        return np.array([self.idx_to_tok_map.get(int(idx), "<unk>") for idx in id_seq])
+
+    def char_to_idx(self, char_seq):
+        """
+        Converts a list of characters to a sequence of token indices.
+        Performs LaTeX tokenization internally.
+        Input: List of characters (e.g., ['3', '(', '5', ...])
+        Output: numpy array of int64 token indices.
+        """
+        # 1. Join characters into a single string (assume no spaces needed)
+        text = "".join(char_seq)
+        # 2. Tokenize the string using the LaTeX tokenizer
+        tokens = _tokenize_latex(text)
+        # 3. Map the resulting tokens to indices
+        pad_idx = self.tok_to_idx_map.get(PAD_TOK, 0) # Fallback for unknown?
+        # Map unknown tokens to -1 or pad_idx. Using -1.
+        indices = np.array([self.tok_to_idx_map.get(tok, -1) for tok in tokens], dtype=np.int64)
+        # Check for -1s which indicate tokens not in vocab
+        if -1 in indices:
+            unknown_tokens = [tokens[i] for i, idx in enumerate(indices) if idx == -1]
+            print(f"Warning: Unknown tokens encountered in char_to_idx: {set(unknown_tokens)}")
+        return indices
+
     def __getitem__(self, idx):
-        # --- Stroke Data Preparation ---
-        stroke_data = self.dataset[idx]
-        stroke_mask = torch.from_numpy(self.mask[idx])
+        """Gets the idx-th sample from the dataset."""
+        if idx >= len(self): raise IndexError("Index out of range")
 
-        if self.data_aug:
-            # --- Data Augmentation: Random Crop Strokes ---
-            seq_len = int(stroke_mask.sum().item()) # Get actual length from mask
-            start = 0
-            end = self.max_seq_len
+        stroke_mask = torch.from_numpy(self.mask[idx]).float()
+        stroke_data = self.dataset[idx] # Already normalized numpy array
+        stroke_data_tensor = torch.from_numpy(stroke_data).float()
 
-            if seq_len > self.max_seq_len:
-                # If sequence is longer than max_seq_len, pick a random start
-                start = np.random.randint(0, high=seq_len - self.max_seq_len + 1) # Inclusive high
-                end = start + self.max_seq_len
-                actual_cropped_len = self.max_seq_len
-            elif seq_len > 0:
-                 # If sequence is shorter or equal, use the actual length
-                 end = seq_len
-                 actual_cropped_len = seq_len
-            else: # seq_len is 0
-                 end = 0
-                 actual_cropped_len = 0
-
-            # Slice the data and mask, ensuring output tensors have size max_seq_len
-            cropped_stroke = np.full((self.max_seq_len, 3), 0.0, dtype=np.float32) # Pad with 0.0
-            cropped_mask = torch.zeros(self.max_seq_len, dtype=torch.float32)
-
-            if actual_cropped_len > 0:
-                cropped_stroke[:actual_cropped_len] = stroke_data[start:end, :]
-                cropped_mask[:actual_cropped_len] = stroke_mask[start:end]
-
-            stroke_data_tensor = torch.from_numpy(cropped_stroke)
-            stroke_mask = cropped_mask # Use the cropped mask
-
-            # Create input sequence (shifted target) - handle short/empty sequences
-            input_seq = torch.zeros_like(stroke_data_tensor, dtype=torch.float32)
-            if actual_cropped_len > 1:
-                input_seq[1:actual_cropped_len, :] = stroke_data_tensor[:actual_cropped_len-1, :]
-
+        if self.text_req:
+            input_seq = torch.zeros_like(stroke_data_tensor)
+            if stroke_data_tensor.shape[0] > 1:
+                 input_seq[1:, :] = stroke_data_tensor[:-1, :]
             target = stroke_data_tensor
-
-            # Note: Text data is NOT augmented/cropped here, only strokes are.
-            # If you need corresponding text cropping, that's more complex.
-            if self.text_req:
-                 token_ids = torch.from_numpy(self.token_ids[idx]).long()
-                 token_mask = torch.from_numpy(self.token_mask[idx])
-                 return (input_seq, target, stroke_mask, token_ids, token_mask)
-            else:
-                 return (input_seq, target, stroke_mask)
-
-        else:
-             # --- No Data Augmentation ---
-            stroke_data_tensor = torch.from_numpy(stroke_data)
-            input_seq = torch.zeros_like(stroke_data_tensor, dtype=torch.float32)
-            # Shift data by one time step for input (predict next point from previous)
+            # Return the pre-computed token indices and mask
+            text_indices = torch.from_numpy(self.texts[idx]).long()
+            token_mask = torch.from_numpy(self.char_mask[idx]).float()
+            return (input_seq, target, stroke_mask, text_indices, token_mask)
+        elif self.data_aug:
+            # Data augmentation logic (as before)
             seq_len = int(stroke_mask.sum().item())
-            if seq_len > 1:
-                input_seq[1:seq_len, :] = stroke_data_tensor[:seq_len-1, :]
-
+            start = 0; data_len = stroke_data_tensor.shape[0]; end = min(seq_len, data_len)
+            if seq_len > self.max_seq_len:
+                high = max(1, seq_len - self.max_seq_len + 1)
+                start = np.random.randint(0, high=high)
+                end = start + self.max_seq_len
+            start = min(start, data_len); end = min(end, data_len)
+            if start >= end and data_len > 0: start = max(0, data_len - 1); end = data_len
+            elif start >= end and data_len == 0: start, end = 0, 0
+            cropped_stroke = stroke_data_tensor[start:end, :]; cropped_mask = stroke_mask[start:end]
+            input_seq = torch.zeros_like(cropped_stroke)
+            if cropped_stroke.shape[0] > 1: input_seq[1:, :] = cropped_stroke[:-1, :]
+            target = cropped_stroke
+            return (input_seq, target, cropped_mask)
+        else:
+            # Standard return (no text, no aug)
+            input_seq = torch.zeros_like(stroke_data_tensor)
+            if stroke_data_tensor.shape[0] > 1: input_seq[1:, :] = stroke_data_tensor[:-1, :]
             target = stroke_data_tensor
-
-            if self.text_req:
-                # --- Include Tokenized Text ---
-                token_ids = torch.from_numpy(self.token_ids[idx]).long() # Use long for token IDs
-                token_mask = torch.from_numpy(self.token_mask[idx])
-                return (input_seq, target, stroke_mask, token_ids, token_mask)
-            else:
-                # --- Strokes Only ---
-                return (input_seq, target, stroke_mask)
+            return (input_seq, target, stroke_mask)

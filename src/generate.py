@@ -298,7 +298,8 @@ if __name__ == "__main__":
     model_path = args.model_path
     model = args.model
 
-    train_dataset = HandwritingDataset(
+    # train_dataset = HandwritingDataset(
+    train_dataset = MathHandwritingDataset(
         args.data_path, split="train", text_req=args.text_req
     )
 

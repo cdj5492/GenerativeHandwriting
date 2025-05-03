@@ -33,7 +33,7 @@ def argparser():
     parser.add_argument("--hidden_size", type=int, default=400)
     parser.add_argument("--n_layers", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--step_size", type=int, default=500)
+    parser.add_argument("--step_size", type=int, default=1000)
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--patience", type=int, default=50)
@@ -178,8 +178,6 @@ def train(
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = StepLR(optimizer, step_size=step_size, gamma=0.1)
 
-    train_losses = []
-    valid_losses = []
     best_loss = math.inf
     best_epoch = 0
     k = 0
@@ -224,7 +222,17 @@ def train(
         save_name=save_path + "/" + model_type + "/" + model_type + "_seq_" + str(best_epoch) + ".png",
     )
 
-    for epoch in range(n_epochs):
+    # load the train and valid losses if they exist
+    if os.path.exists(save_path + "/" + model_type + "/" + model_type + "_train_losses.npy"):
+        train_losses = list(np.load(save_path + "/" + model_type + "/" + model_type + "_train_losses.npy"))
+        valid_losses = list(np.load(save_path + "/" + model_type + "/" + model_type + "_valid_losses.npy"))
+    else:
+        train_losses = []
+        valid_losses = []
+    
+    start_epoch = len(train_losses)
+
+    for epoch in range(start_epoch, n_epochs):
         print("training.....")
         train_loss = train_epoch(
             model, optimizer, epoch, train_loader, device, model_type
@@ -235,6 +243,10 @@ def train(
 
         train_losses.append(train_loss)
         valid_losses.append(valid_loss)
+
+        # save the losses to a file so they could be re-loaded
+        np.save(save_path + "/" + model_type + "/" + model_type + "_train_losses.npy", train_losses)
+        np.save(save_path + "/" + model_type + "/" + model_type + "_valid_losses.npy", valid_losses)
 
         print("Epoch {}: Train: avg. loss: {:.3f}".format(epoch + 1, train_loss))
         print("Epoch {}: Valid: avg. loss: {:.3f}".format(epoch + 1, valid_loss))
@@ -282,6 +294,7 @@ def train(
                 token_seq = train_dataset.char_to_idx(char_seq)
                 # convert back
                 token_char_seq = train_dataset.idx_to_char(token_seq)
+                print("token_char_seq: ", token_char_seq)
 
                 plt.imshow(phi, cmap="viridis", aspect="auto")
                 plt.colorbar()
@@ -345,16 +358,16 @@ if __name__ == "__main__":
     n_epochs = args.n_epochs
 
     # Load the data and text
-    # train_dataset = MathHandwritingDataset(
-    train_dataset = HandwritingDataset(
+    train_dataset = MathHandwritingDataset(
+    # train_dataset = HandwritingDataset(
         args.data_path,
         split="train",
         text_req=args.text_req,
         debug=args.debug,
         data_aug=args.data_aug,
     )
-    # valid_dataset = MathHandwritingDataset(
-    valid_dataset = HandwritingDataset(
+    valid_dataset = MathHandwritingDataset(
+    # valid_dataset = HandwritingDataset(
         args.data_path,
         split="valid",
         text_req=args.text_req,
