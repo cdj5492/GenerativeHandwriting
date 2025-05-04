@@ -233,6 +233,8 @@ def train(
     start_epoch = len(train_losses)
 
     for epoch in range(start_epoch, n_epochs):
+        print("\n--- Epoch {} ---".format(epoch + 1))
+
         print("training.....")
         train_loss = train_epoch(
             model, optimizer, epoch, train_loader, device, model_type
