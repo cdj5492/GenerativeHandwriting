@@ -99,7 +99,7 @@ class HandwritingDataset(Dataset):
         return np.array([self.id_to_char[id] for id in id_seq])
 
     def char_to_idx(self, char_seq):
-        return np.array([self.char_to_id[char] for char in char_seq]).astype(np.int64)
+        return np.array([self.char_to_id[char] for char in char_seq]).astype(np.int8)
 
     def build_vocab(self, texts):
         counter = Counter()
@@ -152,12 +152,22 @@ class HandwritingDataset(Dataset):
 PAD_TOK = "<pad>"
 START_SQRT_TOK = "\\sqrt{"
 END_SQRT_TOK = "}"
-PI_TOK = "\\pi"
 START_FRAC_TOK = "\\frac{"
 MID_FRAC_TOK = "}{"
 END_FRAC_TOK = "}"
+PI_TOK = "\\pi"
+TIMES_TOK_STR = "\\times"
+NEQ_TOK_STR = "\\neq"
+LEQ_TOK_STR = "\\leq"
+GEQ_TOK_STR = "\\geq"
 
-SPECIAL_TOKENS = [PAD_TOK, START_SQRT_TOK, END_SQRT_TOK, PI_TOK, START_FRAC_TOK, MID_FRAC_TOK]
+GREEK_COMMANDS = [
+    "\\alpha", "\\beta", "\\gamma", "\\delta", "\\epsilon", "\\theta", "\\lambda",
+    "\\mu", "\\nu", "\\xi", "\\rho", "\\sigma", "\\tau", "\\phi", "\\chi",
+    "\\psi", "\\omega"
+]
+
+SPECIAL_TOKENS = [PAD_TOK, START_SQRT_TOK, END_SQRT_TOK, START_FRAC_TOK, MID_FRAC_TOK, PI_TOK, TIMES_TOK_STR, NEQ_TOK_STR, LEQ_TOK_STR, GEQ_TOK_STR] + GREEK_COMMANDS
 
 # --- Helper Functions for LaTeX Tokenization ---
 
@@ -297,7 +307,7 @@ class MathHandwritingDataset(Dataset):
         print(f"Maximum token sequence length (after tokenization): {max_tok_len}")
         n_total = len(strokes) # Use length after potential trimming
 
-        padded_tok_indices = np.full((n_total, max_tok_len), pad_idx, dtype=np.int64)
+        padded_tok_indices = np.full((n_total, max_tok_len), pad_idx, dtype=np.int8)
         for i, seq in enumerate(tok_indices):
             current_len = len(seq)
             if current_len > max_tok_len:
@@ -348,7 +358,7 @@ class MathHandwritingDataset(Dataset):
              print("Warning: No data samples after processing.")
              # Init empty attributes
              self.dataset = np.empty((0, max_stroke_len, 3), dtype=np.float32); self.mask = np.empty((0, max_stroke_len), dtype=np.float32)
-             self.texts = np.empty((0, max_tok_len), dtype=np.int64); self.char_mask = np.empty((0, max_tok_len), dtype=np.float32)
+             self.texts = np.empty((0, max_tok_len), dtype=np.int8); self.char_mask = np.empty((0, max_tok_len), dtype=np.float32)
              return
 
         print(f"Total samples: {n_samples}, Training samples: {n_train}, Validation samples: {n_samples - n_train}")
@@ -364,7 +374,7 @@ class MathHandwritingDataset(Dataset):
             if n_train >= n_samples:
                  print("Warning: No validation samples after split."); n_val = 0
                  self.dataset = np.empty((0, max_stroke_len, 3), dtype=np.float32); self.mask = np.empty((0, max_stroke_len), dtype=np.float32)
-                 self.texts = np.empty((0, max_tok_len), dtype=np.int64); self.char_mask = np.empty((0, max_tok_len), dtype=np.float32)
+                 self.texts = np.empty((0, max_tok_len), dtype=np.int8); self.char_mask = np.empty((0, max_tok_len), dtype=np.float32)
             else:
                 self.dataset = stroke_data[n_train:]; self.mask = stroke_mask[n_train:]
                 self.texts = self.token_sequences[n_train:]; self.char_mask = self.token_mask[n_train:]
@@ -409,7 +419,7 @@ class MathHandwritingDataset(Dataset):
         Converts a list of characters to a sequence of token indices.
         Performs LaTeX tokenization internally.
         Input: List of characters (e.g., ['3', '(', '5', ...])
-        Output: numpy array of int64 token indices.
+        Output: numpy array of int8 token indices.
         """
         # 1. Join characters into a single string (assume no spaces needed)
         text = "".join(char_seq)
@@ -418,7 +428,7 @@ class MathHandwritingDataset(Dataset):
         # 3. Map the resulting tokens to indices
         pad_idx = self.tok_to_idx_map.get(PAD_TOK, 0) # Fallback for unknown?
         # Map unknown tokens to -1 or pad_idx. Using -1.
-        indices = np.array([self.tok_to_idx_map.get(tok, -1) for tok in tokens], dtype=np.int64)
+        indices = np.array([self.tok_to_idx_map.get(tok, -1) for tok in tokens], dtype=np.int8)
         # Check for -1s which indicate tokens not in vocab
         if -1 in indices:
             unknown_tokens = [tokens[i] for i, idx in enumerate(indices) if idx == -1]
